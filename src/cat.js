@@ -40,8 +40,36 @@
   // vx: gerçek yatay hız (hızlanma/yavaşlama ile), vel: |vx| (iskelet adım hızı için)
   const cat = { x: 70, y: 0, vx: 0, vel: 0, vy: 0, dir: 1, mode: 'idle', target: null, speed: 30, onArrive: null, busyUntil: 0 };
   // dönüş animasyonu: s = görünen yön (-1..1), t = ilerleme (0..1)
-  const turn = { s: 1, from: 1, to: 1, t: 1 };
-  const TURN_DUR = 0.3;
+  // kind: 'back' → arkasını dönerek (kareli), 'squash' → daralıp aynalanarak
+  const turn = { s: 1, from: 1, to: 1, t: 1, kind: 'squash', dur: 0.3 };
+  const TURN_DUR = 0.3;          // daralma dönüşü
+  const BACK_TURN_DUR = 0.5;     // arkadan dönüş: yan → arka-3/4 → arka → arka-3/4 → yan
+  const BACK_WALK_AT = 0.85;     // arkadan dönüşte yürümeye bu noktadan sonra başla
+
+  // arkadan dönüş kareleri (src/kedi/donus-veri.js, sağa bakan kedi için çizili)
+  const DONUS = window.KEDI_DONUS || null;
+  const sprites = {};
+  if (DONUS) {
+    for (const name of ['back34', 'back']) {
+      const d = DONUS[name], im = new Image();
+      im.className = 'turn-sprite';
+      im.id = 'turn-' + name;
+      im.src = d.src;
+      im.style.width = d.w + 'px'; im.style.height = d.h + 'px';
+      im.style.marginLeft = (-d.w / 2) + 'px';
+      im.decode && im.decode().catch(() => {});
+      catEl.appendChild(im);
+      sprites[name] = im;
+    }
+  }
+  // Kareler ayakta duran kediyi gösterir; çömelmiş, havada ya da oyun kovalıyorken
+  // tuhaf durur → o durumlarda daralma dönüşü kullanılır.
+  const NO_SPRITE_POSES = ['crouch', 'lookup', 'bat', 'eat', 'sleep', 'groom', 'land', 'happy'];
+  function canBackTurn() {
+    if (!DONUS || cat.y < 0 || cat.mode === 'play' || cat.mode === 'laser') return false;
+    for (const p of NO_SPRITE_POSES) if (posed(p)) return false;
+    return true;
+  }
   const ACC = 260;        // kalkış ivmesi (px/s²)
   const DEC = 420;        // fren (dur komutu, yön değişimi)
   const ARRIVE = 150;     // hedefe yaklaşırken yavaş yavaş süzülerek durma
@@ -451,7 +479,7 @@
         const cb = cat.onArrive; cat.onArrive = null; cb && cb();
       } else if (sign(d) !== cat.dir) {
         if (Math.abs(cat.vx) < 12) cat.dir = sign(d);   // yavaşladıysa dön
-      } else if (turn.t > 0.55) {                       // dönüşün yarısından sonra yürümeye başla
+      } else if (turn.t > (turn.kind === 'back' ? BACK_WALK_AT : 0.55)) {   // dönüş bitmeye yakın yürümeye başla
         want = sign(d) * Math.max(8, Math.min(cat.speed, Math.sqrt(2 * ARRIVE * Math.abs(d))));
       }
     }
@@ -468,10 +496,17 @@
     cat.vel = Math.abs(cat.vx);
     pose('walk', cat.y === 0 && cat.vel > 2);
 
-    // dönüş: yön değişince görünen yön 0.3 sn'de yumuşakça çevrilir
-    if (cat.dir !== turn.to) { turn.from = turn.s; turn.to = cat.dir; turn.t = 0; }
+    // dönüş: tam bir yöne bakarken ve ayaktayken arkasını dönerek, aksi hâlde daralarak
+    if (cat.dir !== turn.to) {
+      const back = turn.t >= 1 && canBackTurn();
+      turn.from = turn.s; turn.to = cat.dir; turn.t = 0;
+      turn.kind = back ? 'back' : 'squash';
+      turn.dur = back ? BACK_TURN_DUR : TURN_DUR;
+    }
+    // dönüş sırasında oyun başlarsa / kedi çömelirse kareli dönüşü bırak
+    if (turn.kind === 'back' && turn.t < 1 && !canBackTurn()) turn.kind = 'squash';
     if (turn.t < 1) {
-      turn.t = Math.min(1, turn.t + dt / TURN_DUR);
+      turn.t = Math.min(1, turn.t + dt / turn.dur);
       const e = turn.t < 0.5 ? 4 * turn.t ** 3 : 1 - (-2 * turn.t + 2) ** 3 / 2;   // easeInOutCubic
       turn.s = turn.from + (turn.to - turn.from) * e;
     }
@@ -488,12 +523,33 @@
     // çiz
     setStyle(catEl, 'transform', `translate(${(cat.x - CAT_W / 2).toFixed(2)}px, ${(FLOOR - CAT_H + cat.y).toFixed(2)}px)`);
     // dönüşte en dar hâlde bile %22 genişlikte kalır (çizgiye dönüşmesin); ortada hafif çömelme
-    const tm = Math.abs(turn.s), mid = turn.t < 1 ? Math.sin(Math.PI * turn.t) : 0;
-    const sx = (turn.s < 0 || (turn.s === 0 && turn.to < 0) ? -1 : 1) * (0.22 + 0.78 * tm);
-    setStyle(catInner, 'transform', `scale(${sx.toFixed(3)}, ${(1 - 0.05 * mid).toFixed(3)})`);
+    let sx, sy = 1, shadowW, frameName = null, frameDir = 1;
+    if (turn.kind === 'back' && turn.t < 1) {
+      // yan (hafif daralır) → arka-3/4 → arka → arka-3/4 (ayna) → yan (ayna, genişler)
+      const t = turn.t, f = turn.from > 0 ? 1 : -1;
+      if (t < 0.14)      { sx = f * (1 - 0.18 * (t / 0.14)); shadowW = 1 - 0.15 * (t / 0.14); }
+      else if (t < 0.38) { frameName = 'back34'; frameDir = f; shadowW = 0.75; }
+      else if (t < 0.62) { frameName = 'back'; shadowW = 0.6; }
+      else if (t < 0.86) { frameName = 'back34'; frameDir = -f; shadowW = 0.75; }
+      else               { const k = (t - 0.86) / 0.14; sx = -f * (0.82 + 0.18 * k); shadowW = 0.85 + 0.15 * k; }
+      if (frameName) sy = 1 - 0.025 * Math.sin(Math.PI * (t - 0.14) / 0.72);   // ortada hafif çökme
+    } else {
+      const tm = Math.abs(turn.s), mid = turn.t < 1 ? Math.sin(Math.PI * turn.t) : 0;
+      sx = (turn.s < 0 || (turn.s === 0 && turn.to < 0) ? -1 : 1) * (0.22 + 0.78 * tm);
+      sy = 1 - 0.05 * mid;
+      shadowW = 0.8 + 0.2 * tm;
+    }
+    // kare gösterilirken iskeletli kedi gizlenir (çizilmeye devam eder, geri dönüşte hazır olsun)
+    setStyle(catInner, 'visibility', frameName ? 'hidden' : 'visible');
+    if (!frameName) setStyle(catInner, 'transform', `scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`);
+    for (const name in sprites) {
+      const on = name === frameName;
+      setStyle(sprites[name], 'display', on ? 'block' : 'none');
+      if (on) setStyle(sprites[name], 'transform', `scale(${frameDir}, ${sy.toFixed(3)})`);
+    }
     rigBusy = window.__catTick ? !!window.__catTick(dt) : false;
     const sh = 1 + cat.y / 90;
-    setStyle(shadowEl, 'transform', `translate(${cat.x.toFixed(2)}px, ${FLOOR - 1}px) scale(${(sh * (0.8 + 0.2 * tm)).toFixed(3)}, ${sh.toFixed(3)})`);
+    setStyle(shadowEl, 'transform', `translate(${cat.x.toFixed(2)}px, ${FLOOR - 1}px) scale(${(sh * shadowW).toFixed(3)}, ${sh.toFixed(3)})`);
     setStyle(shadowEl, 'opacity', ((cat.mode === 'sleep' ? 0.6 : 1) * (0.5 + 0.5 * sh)).toFixed(3));
     yarnShadowEl.classList.toggle('on', yarn.on && !yarn.fadeAt);
     if (yarn.on) setStyle(yarnShadowEl, 'transform', `translate(${yarn.x.toFixed(2)}px, ${FLOOR - 1}px) scale(${(0.55 + 0.45 * Math.max(0, 1 - (FLOOR - yarn.r - yarn.y) / 110)).toFixed(3)})`);
