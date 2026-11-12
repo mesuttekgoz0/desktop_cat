@@ -206,11 +206,11 @@ html, body {
 .cat.sleep .zzz { opacity: 1; }
 .zzz span {
   position: absolute; font-weight: 800; color: #9a8acb; font-size: 9px;
-  animation: zz 2.4s ease-in infinite; opacity: 0;
+  opacity: 0;
 }
-.zzz span:nth-child(2) { animation-delay: .8s; font-size: 10px; }
-.zzz span:nth-child(3) { animation-delay: 1.6s; font-size: 12px; }
-@keyframes zz { 0% { transform: translate(0,6px); opacity: 0; } 25% { opacity: 1; } 100% { transform: translate(10px,-16px); opacity: 0; } }
+/* hareket cat.js ana döngüsünde (düşük kare hızında) yapılır; CSS animasyonu 60 fps zorlardı */
+.zzz span:nth-child(2) { font-size: 10px; }
+.zzz span:nth-child(3) { font-size: 12px; }
 
 /* ================= YUMAK ================= */
 #yarn {
@@ -312,11 +312,13 @@ html, body {
   color: #5a3d30;
   display: flex; flex-direction: column;
   opacity: 0; transform: scale(.94); pointer-events: none;
-  transition: opacity .18s, transform .18s;
+  /* kapalıyken visibility:hidden → arkadaki blur her karede yeniden hesaplanmaz */
+  visibility: hidden;
+  transition: opacity .18s, transform .18s, visibility 0s .18s;
   z-index: 10;
 }
 .side-left #settings { left: 46px; }
-#settings.open { opacity: 1; transform: scale(1); pointer-events: auto; }
+#settings.open { opacity: 1; transform: scale(1); pointer-events: auto; visibility: visible; transition: opacity .18s, transform .18s, visibility 0s; }
 .st-head { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; font-weight: 800; padding: 0 2px 0 4px; }
 .st-close {
   width: 20px; height: 20px; border-radius: 50%; border: none; padding: 0;

@@ -147,7 +147,8 @@
   // ---------- canvas / WebGL ----------
   const catEl = document.getElementById('cat');
   const inner = document.getElementById('catInner');
-  const dpr = Math.max(2, window.devicePixelRatio || 1);
+  // gerçek piksel yoğunluğu (Retina'da 2, 1x ekranda 1); zorla 2x çizmiyoruz
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
   const cssW = FW * K, cssH = FH * K;
   const canvas = document.createElement('canvas');
   canvas.className = 'rig';
@@ -256,11 +257,20 @@
   }
 
   const ease = (a, b, r, dt) => a + (b - a) * (1 - Math.exp(-r * dt));
+  // poz hedefe yaklaşırken geçişin ne kadar sürdüğünü döndürür (kare hızı kararı için)
+  const KEYS = Object.keys(T);
   function settle(dt) {
-    for (const key of Object.keys(T)) {
-      if (Array.isArray(T[key])) for (let i = 0; i < 4; i++) P[key][i] = ease(P[key][i], T[key][i], 11, dt);
-      else P[key] = ease(P[key], T[key], key === 'blink' ? 38 : key === 'walk' || key === 'run' ? 7 : 9, dt);
+    let gap = 0;
+    for (const key of KEYS) {
+      if (Array.isArray(T[key])) for (let i = 0; i < 4; i++) {
+        P[key][i] = ease(P[key][i], T[key][i], 11, dt);
+        gap = Math.max(gap, Math.abs(T[key][i] - P[key][i]));
+      } else {
+        P[key] = ease(P[key], T[key], key === 'blink' ? 38 : key === 'walk' || key === 'run' ? 7 : 9, dt);
+        gap = Math.max(gap, Math.abs(T[key] - P[key]) * (key === 'blink' || key === 'walk' || key === 'run' ? 40 : 1));
+      }
     }
+    return gap;
   }
 
   // ---------- deformasyon ----------
@@ -356,21 +366,24 @@
   // boyut değişince (zoom) çözünürlüğü güncelle, bulanık kalmasın
   let curDpr = dpr;
   function fitCanvas() {
-    const d = Math.max(2, window.devicePixelRatio || 1);
+    const d = Math.max(1, window.devicePixelRatio || 1);
     if (d === curDpr) return;
     curDpr = d;
     canvas.width = Math.round(cssW * d); canvas.height = Math.round(cssH * d);
     if (gl) gl.viewport(0, 0, canvas.width, canvas.height);
   }
 
+  // dönüş değeri: true → poz hâlâ geçişte, akıcı görünmesi için yüksek kare hızı gerekli
   window.__catTick = (dt) => {
-    if (!ready || !draw2d) return;
+    if (!ready || !draw2d) return false;
     fitCanvas();
     time += dt;
     const k = (window.__kedi && window.__kedi.cat) || { speed: 30 };
-    targets(); settle(dt);
+    targets();
+    const gap = settle(dt);
     phase = (phase + dt * lerp(1.5, 3.2, P.run) * (0.4 + 0.6 * P.walk) * (k.speed > 0 ? clamp(k.speed / 34, 0.8, 1.6) : 1)) % 1;
     deform();
     draw2d();
+    return gap > 0.6;
   };
 })();

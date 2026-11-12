@@ -360,9 +360,60 @@
   // ====================================================
   //  ANA DÖNGÜ
   // ====================================================
+  // Kare hızı duruma göre: hareket varken 60, boşta 30, uykuda 15.
+  // 120 Hz (ProMotion) ekranlarda da en fazla 60 çizilir.
+  const BUSY_POSES = ['walk', 'happy', 'crouch', 'bat', 'groom', 'eat', 'land', 'lookup', 'blink', 'twitch'];
+  let rigBusy = true;
+  function targetFps() {
+    if (rigBusy || dragging || laser.on || yarn.on || cat.target != null || cat.y < 0 || cat.vy !== 0) return 60;
+    if (cat.mode !== 'idle' && cat.mode !== 'sleep') return 60;
+    for (const p of BUSY_POSES) if (posed(p)) return 60;
+    return cat.mode === 'sleep' ? 15 : 30;
+  }
+
+  // aynı değeri tekrar tekrar yazıp tarayıcıya boşuna iş çıkarmayalım
+  const lastCss = new Map();
+  function setStyle(el, prop, v) {
+    const k = el.id + '.' + prop;
+    if (lastCss.get(k) === v) return;
+    lastCss.set(k, v);
+    el.style[prop] = v;
+  }
+
+  // uyku "z"leri: 2.4 sn'lik döngü, üçü 0.8 sn arayla
+  const zzEls = [...document.querySelectorAll('.zzz span')];
+  zzEls.forEach((el, i) => { el.id = el.id || 'zz' + i; });
+  function updateZzz(t) {
+    const on = cat.mode === 'sleep';
+    zzEls.forEach((el, i) => {
+      if (!on) { setStyle(el, 'opacity', '0'); return; }
+      const p = (((t / 1000 - i * 0.8) % 2.4) + 2.4) % 2.4 / 2.4;
+      const e = p * p * (1.6 - 0.6 * p);              // ease-in benzeri
+      const op = p < 0.25 ? p / 0.25 : 1 - (p - 0.25) / 0.75;
+      setStyle(el, 'transform', `translate(${(10 * e).toFixed(1)}px, ${(6 - 22 * e).toFixed(1)}px)`);
+      setStyle(el, 'opacity', op.toFixed(2));
+    });
+  }
+
+  // 60 fps'te rAF; daha düşük hızda bir sonraki kareyi setTimeout ile planla
+  // (rAF'ı boşuna 60/120 Hz'de uyandırmamak için)
+  let wakeT = null;
+  function schedule() {
+    const fps = targetFps();
+    if (fps >= 60) { requestAnimationFrame(frame); return; }
+    wakeT = setTimeout(() => { wakeT = null; requestAnimationFrame(frame); }, 1000 / fps - 6);
+  }
+  // kullanıcı etkileşiminde beklemeden hızlan
+  function kick() {
+    if (wakeT === null) return;
+    clearTimeout(wakeT); wakeT = null;
+    requestAnimationFrame(frame);
+  }
+
   let last = performance.now();
   function frame(t) {
-    const dt = Math.min(0.05, (t - last) / 1000);
+    if (t - last < 1000 / targetFps() - 2) { requestAnimationFrame(frame); return; }   // 120 Hz'de fazla kareyi atla
+    const dt = Math.min(0.08, (t - last) / 1000);
     last = t; now = t;
     petAmt *= Math.pow(0.35, dt);
 
@@ -390,20 +441,21 @@
     else if (cat.mode === 'idle') idleThink();
 
     // çiz
-    catEl.style.transform = `translate(${(cat.x - CAT_W / 2).toFixed(2)}px, ${(FLOOR - CAT_H + cat.y).toFixed(2)}px)`;
-    catInner.style.transform = `scaleX(${cat.dir})`;
-    if (window.__catTick) window.__catTick(dt);
+    setStyle(catEl, 'transform', `translate(${(cat.x - CAT_W / 2).toFixed(2)}px, ${(FLOOR - CAT_H + cat.y).toFixed(2)}px)`);
+    setStyle(catInner, 'transform', `scaleX(${cat.dir})`);
+    rigBusy = window.__catTick ? !!window.__catTick(dt) : false;
     const sh = 1 + cat.y / 90;
-    shadowEl.style.transform = `translate(${cat.x.toFixed(2)}px, ${FLOOR - 1}px) scale(${sh.toFixed(3)})`;
-    shadowEl.style.opacity = (cat.mode === 'sleep' ? 0.6 : 1) * (0.5 + 0.5 * sh);
+    setStyle(shadowEl, 'transform', `translate(${cat.x.toFixed(2)}px, ${FLOOR - 1}px) scale(${sh.toFixed(3)})`);
+    setStyle(shadowEl, 'opacity', ((cat.mode === 'sleep' ? 0.6 : 1) * (0.5 + 0.5 * sh)).toFixed(3));
     yarnShadowEl.classList.toggle('on', yarn.on && !yarn.fadeAt);
-    if (yarn.on) yarnShadowEl.style.transform = `translate(${yarn.x.toFixed(2)}px, ${FLOOR - 1}px) scale(${(0.55 + 0.45 * Math.max(0, 1 - (FLOOR - yarn.r - yarn.y) / 110)).toFixed(3)})`;
-    if (yarn.on) yarnEl.style.transform = `translate(${(yarn.x - yarn.r).toFixed(2)}px, ${(yarn.y - yarn.r).toFixed(2)}px) rotate(${yarn.rot.toFixed(1)}deg)`;
+    if (yarn.on) setStyle(yarnShadowEl, 'transform', `translate(${yarn.x.toFixed(2)}px, ${FLOOR - 1}px) scale(${(0.55 + 0.45 * Math.max(0, 1 - (FLOOR - yarn.r - yarn.y) / 110)).toFixed(3)})`);
+    if (yarn.on) setStyle(yarnEl, 'transform', `translate(${(yarn.x - yarn.r).toFixed(2)}px, ${(yarn.y - yarn.r).toFixed(2)}px) rotate(${yarn.rot.toFixed(1)}deg)`);
     if (laser.on) {
       laserEl.classList.toggle('on', laser.visible);
-      laserEl.style.transform = `translate(${laser.x}px, ${laser.y}px)`;
+      setStyle(laserEl, 'transform', `translate(${laser.x}px, ${laser.y}px)`);
     }
-    requestAnimationFrame(frame);
+    updateZzz(t);
+    schedule();
   }
   requestAnimationFrame(frame);
 
@@ -413,12 +465,14 @@
   let down = null, dragging = false, menuOpen = false;
 
   nest.addEventListener('pointerdown', (e) => {
+    kick();
     if (e.button !== 0) return;
     down = { x: e.screenX, y: e.screenY, target: e.target };
     dragging = false;
     nest.setPointerCapture(e.pointerId);
   });
   nest.addEventListener('pointermove', (e) => {
+    kick();
     if (laser.on) {
       const r = nest.getBoundingClientRect();
       laser.x = clamp(e.clientX - r.left, 6, NEST - 6);
@@ -502,7 +556,7 @@
   menuEl.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
-    touch();
+    touch(); kick();
     const act = b.dataset.act;
     if (act === 'yarn') dropYarn();
     else if (act === 'food') feed();
