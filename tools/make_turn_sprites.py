@@ -21,8 +21,9 @@ SRC = ROOT / "art" / "kedi-donus-sayfasi.png"
 OUT = ROOT / "src" / "kedi" / "donus-veri.js"
 
 LABEL_TOP = 760          # bu satırın altı yazılar; kediler üstte
-# görünüş adı -> bölge merkezinin yaklaşık x konumu (kaynak sayfa pikseli)
-VIEWS = {"back": 116, "back34": 320}
+# görünüş adı -> (bölge merkezinin yaklaşık x'i, kesim sınırı x_min)
+# Ön görünüş yan komşusuna bıyıklarıyla yapışık; x_min ile ayrılır.
+VIEWS = {"back": (116, None), "back34": (320, None), "front": (912, 812)}
 # sayfa pikseli -> ekran (css) pikseli; uygulamadaki kediyle aynı boy (bkz. rig.js K)
 SCALE = 0.164
 WEBP_QUALITY = 88
@@ -77,13 +78,15 @@ def main():
 
     # 3) her görünüşü kes, kenarı yumuşat (beyaz hale kalmasın), webp'e çevir
     out = {}
-    for name, cx in VIEWS.items():
-        comp = min(big, key=lambda c: abs((c["box"][0] + c["box"][2]) / 2 - cx))
+    for name, (cx, x_min) in VIEWS.items():
+        # x_min varsa bölge o sınırın sağında kalan kısmıdır (yapışık kediler)
+        comp = min(big, key=lambda c: 0 if c["box"][0] <= cx <= c["box"][2] else abs((c["box"][0] + c["box"][2]) / 2 - cx))
         mask = Image.new("L", (w, h), 0)
         mp = mask.load()
+        x0 = max(comp["box"][0], x_min or 0)
         for y in range(h):
             row = y * w
-            for x in range(comp["box"][0], comp["box"][2] + 1):
+            for x in range(x0, comp["box"][2] + 1):
                 if label[row + x] == comp["id"]:
                     mp[x, y] = 255
         mask = mask.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.8))

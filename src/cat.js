@@ -50,8 +50,10 @@
   const DONUS = window.KEDI_DONUS || null;
   const sprites = {};
   if (DONUS) {
-    for (const name of ['back34', 'back']) {
-      const d = DONUS[name], im = new Image();
+    for (const name of ['back34', 'back', 'front']) {
+      const d = DONUS[name];
+      if (!d) continue;
+      const im = new Image();
       im.className = 'turn-sprite';
       im.id = 'turn-' + name;
       im.src = d.src;
@@ -69,6 +71,21 @@
     if (!DONUS || cat.y < 0 || cat.mode === 'play' || cat.mode === 'laser') return false;
     for (const p of NO_SPRITE_POSES) if (posed(p)) return false;
     return true;
+  }
+
+  // ---- sana bakma (ön görünüş): sevilince / tıklanınca ----
+  // p: 0 = yan, 1 = tam karşıya bakıyor; until: bu ana kadar bakmaya devam et
+  const face = { p: 0, until: 0 };
+  const FACE_DUR = 0.36;          // yan → ön geçişi (sn)
+  function canFace() {
+    if (!sprites.front || cat.mode !== 'idle' || cat.y < 0) return false;
+    for (const p of ['crouch', 'lookup', 'bat', 'eat', 'sleep', 'groom', 'land']) if (posed(p)) return false;
+    return true;
+  }
+  function lookAtMe(ms) {
+    if (!canFace()) return;
+    face.until = Math.max(face.until, now + ms);
+    stopWalk();
   }
   const ACC = 260;        // kalkış ivmesi (px/s²)
   const DEC = 420;        // fren (dur komutu, yön değişimi)
@@ -96,7 +113,8 @@
     const h = document.createElement('div');
     h.className = 'heart';
     h.innerHTML = HEART;
-    h.style.left = (cat.x + cat.dir * (HEAD_DX || 14) + rand(-6, 6)) + 'px';
+    const headX = face.p > 0.5 ? 0 : cat.dir * (HEAD_DX || 14);   // karşıya bakıyorsa kafa ortada
+    h.style.left = (cat.x + headX + rand(-6, 6)) + 'px';
     h.style.top = (FLOOR - CAT_H + 10 + cat.y) + 'px';
     h.style.setProperty('--dx', rand(-12, 12) + 'px');
     fx.appendChild(h);
@@ -344,6 +362,7 @@
   // Yeni bir etkinlikten önce her şeyi temiz bir duruma getirir.
   function endActivities() {
     cancelLater();
+    face.until = 0;
     stopLaser();
     if (yarn.on && !yarn.fadeAt) yarn.fadeAt = now + 600;
     bowlEl.classList.remove('on', 'full');
@@ -397,7 +416,7 @@
     petAmt = 0; touch();
     purrUntil = now + 2600;
     const sleeping = cat.mode === 'sleep';
-    if (!sleeping) { if (cat.mode === 'tobed') wake(); stopWalk(); pose('groom', false); pose('happy'); }
+    if (!sleeping) { if (cat.mode === 'tobed') wake(); stopWalk(); pose('groom', false); pose('happy'); lookAtMe(2800); }
     hearts(sleeping ? 2 : 5, 300);
     setTimeout(() => { if (!sleeping) pose('happy', false); }, 2400);
     const msgs = A.mesajlar || [];
@@ -412,7 +431,7 @@
   const BUSY_POSES = ['walk', 'happy', 'crouch', 'bat', 'groom', 'eat', 'land', 'lookup', 'blink', 'twitch'];
   let rigBusy = true;
   function targetFps() {
-    if (rigBusy || dragging || laser.on || yarn.on || cat.target != null || cat.vx !== 0 || turn.t < 1 || cat.y < 0 || cat.vy !== 0) return 60;
+    if (rigBusy || dragging || laser.on || yarn.on || cat.target != null || cat.vx !== 0 || turn.t < 1 || face.p > 0 || cat.y < 0 || cat.vy !== 0) return 60;
     if (cat.mode !== 'idle' && cat.mode !== 'sleep') return 60;
     for (const p of BUSY_POSES) if (posed(p)) return 60;
     return cat.mode === 'sleep' ? 15 : 30;
@@ -472,7 +491,7 @@
     // yürüme: yumuşak kalkış, hedefe yaklaşırken yavaşlama, ters yöne gitmeden önce durup dönme
     const canWalk = cat.mode !== 'sleep' && cat.mode !== 'eat';
     let want = 0;                                   // istenen hız (işaretli)
-    if (cat.target != null && canWalk) {
+    if (cat.target != null && canWalk && face.p === 0) {   // sana bakarken yürümez
       const d = cat.target - cat.x;
       if (Math.abs(d) < 0.8 && Math.abs(cat.vx) < 40) {
         cat.x = cat.target; cat.vx = 0; cat.target = null;
@@ -511,6 +530,11 @@
       turn.s = turn.from + (turn.to - turn.from) * e;
     }
 
+    // sana bakma: istenirse yavaşça döner, süre bitince / başka iş başlayınca geri döner
+    const wantFace = now < face.until && canFace() && turn.t >= 1;
+    if (turn.t < 1) face.p = 0;
+    face.p = clamp(face.p + (wantFace ? 1 : -1) * dt / FACE_DUR, 0, 1);
+
     // laser her durumda kendi süresini kontrol eder (başka bir etkinlik modu değiştirse bile)
     if (laser.on && cat.mode !== 'laser') stopLaser();
     else if (laser.on && now > laser.until) finishLaser();
@@ -518,7 +542,7 @@
     updateYarn(dt);
     if (cat.mode === 'play') playThink();
     else if (cat.mode === 'laser') laserThink();
-    else if (cat.mode === 'idle') idleThink();
+    else if (cat.mode === 'idle' && now >= face.until) idleThink();   // sana bakarken dolaşmaya kalkmaz
 
     // çiz
     setStyle(catEl, 'transform', `translate(${(cat.x - CAT_W / 2).toFixed(2)}px, ${(FLOOR - CAT_H + cat.y).toFixed(2)}px)`);
@@ -539,13 +563,27 @@
       sy = 1 - 0.05 * mid;
       shadowW = 0.8 + 0.2 * tm;
     }
+    // sana bakma: yan görünüş daralır → ön görünüş genişleyerek gelir (ve tersi)
+    let fx = 1, rot = 0;
+    if (face.p > 0 && !(turn.kind === 'back' && turn.t < 1)) {
+      const e = face.p * face.p * (3 - 2 * face.p);
+      if (e < 0.5) { sx = cat.dir * (1 - 0.8 * e); sy = 1; frameName = null; }
+      else {
+        const ts = now / 1000;
+        frameName = 'front'; frameDir = 1;
+        fx = 0.6 + 0.4 * (e - 0.5) / 0.5;
+        sy = 1 + 0.012 * Math.sin(ts * 2 * Math.PI / 3.3);              // nefes
+        rot = posed('happy') ? 2.2 * Math.sin(ts * 3.4) * e : 0;        // mırlarken hafif sallanma
+      }
+      shadowW = 1 - 0.4 * e;
+    }
     // kare gösterilirken iskeletli kedi gizlenir (çizilmeye devam eder, geri dönüşte hazır olsun)
     setStyle(catInner, 'visibility', frameName ? 'hidden' : 'visible');
     if (!frameName) setStyle(catInner, 'transform', `scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`);
     for (const name in sprites) {
       const on = name === frameName;
       setStyle(sprites[name], 'display', on ? 'block' : 'none');
-      if (on) setStyle(sprites[name], 'transform', `scale(${frameDir}, ${sy.toFixed(3)})`);
+      if (on) setStyle(sprites[name], 'transform', `rotate(${rot.toFixed(2)}deg) scale(${(frameDir * fx).toFixed(3)}, ${sy.toFixed(3)})`);
     }
     rigBusy = window.__catTick ? !!window.__catTick(dt) : false;
     const sh = 1 + cat.y / 90;
@@ -606,9 +644,10 @@
       if (cat.mode !== 'play') { wake(); cat.mode = 'play'; yarn.fadeAt = 0; yarn.born = now; yarn.bats = 0; yarn.goal = Math.round(rand(4, 6)); }
       return;
     }
-    if (catEl.contains(t) && cat.mode !== 'sleep' && Math.random() < 0.35) {
-      jump(-140);
-      setTimeout(() => bubble(Math.random() < .5 ? 'miyav?' : 'mrrp!', 1600), 120);
+    if (catEl.contains(t) && cat.mode !== 'sleep') {
+      const say = () => bubble(Math.random() < .5 ? 'miyav?' : 'mrrp!', 1600);
+      if (Math.random() < 0.35) { jump(-140); setTimeout(say, 120); }
+      else if (canFace()) { lookAtMe(1700); say(); }      // dönüp sana bakar
     }
     setMenu(!menuOpen);
   });
@@ -692,5 +731,5 @@
   }, 900);
 
   // test için dışarı aç
-  window.__kedi = { cat, turn, yarn, laser, store, dropYarn, feed, startLaser, stopLaser, sleep, wake, purr, setMenu, bubble };
+  window.__kedi = { cat, turn, face, lookAtMe, yarn, laser, store, dropYarn, feed, startLaser, stopLaser, sleep, wake, purr, setMenu, bubble };
 })();
