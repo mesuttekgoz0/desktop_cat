@@ -236,8 +236,10 @@
     const happy = c.contains('happy'), crouch = c.contains('crouch'), bat = c.contains('bat');
     const look = c.contains('lookup'), land = c.contains('land');
 
-    T.walk = walking ? 1 : 0;
-    T.run = walking && k.speed > 60 ? 1 : 0;
+    // adım genişliği gerçek hıza bağlı: kalkarken/dururken adımlar kısalır
+    const vel = k.vel != null ? k.vel : k.speed;
+    T.walk = walking ? clamp(vel / 18, 0, 1) : 0;
+    T.run = walking && vel > 60 ? 1 : 0;
     T.head = sleep ? 22 : eat ? 40 : groom ? 26 : look ? -15 : bat ? 6 : crouch ? 6 : happy ? 0 : 0;
     T.bodyDy = sleep ? 150 : eat ? 34 : groom ? 30 : land ? 40 : crouch ? 48 : bat ? 22 : happy ? 8 : 0;
     T.tilt = eat ? 9 : sleep ? -2 : crouch ? 1.5 : 0;
@@ -256,18 +258,30 @@
     if (sleep) { T.lo[0] = -14; T.lo[1] = -10; T.lo[2] = 14; T.lo[3] = 10; }
   }
 
-  const ease = (a, b, r, dt) => a + (b - a) * (1 - Math.exp(-r * dt));
-  // poz hedefe yaklaşırken geçişin ne kadar sürdüğünü döndürür (kare hızı kararı için)
+  // Kritik sönümlü yay: üstel yaklaşımın aksine harekete yavaş başlar, yavaş biter
+  // (ease-in-out hissi) ve hedef aniden değişse bile kırılma yapmaz.
+  // Kesin çözüm kullanıldığı için düşük kare hızında da kararlıdır.
+  const PV = JSON.parse(JSON.stringify(P));
+  for (const key of Object.keys(PV)) {
+    if (Array.isArray(PV[key])) PV[key].fill(0); else PV[key] = 0;
+  }
+  function spring(p, v, target, w, dt) {
+    const x = p - target, e = Math.exp(-w * dt), k = (v + w * x) * dt;
+    return [target + (x + k) * e, (v - w * k) * e];
+  }
+  const RATE = { blink: 52, walk: 10, run: 9 };
   const KEYS = Object.keys(T);
+  // dönüş: pozun hedefe ne kadar uzak olduğu (kare hızı kararı için)
   function settle(dt) {
     let gap = 0;
     for (const key of KEYS) {
+      const big = key === 'blink' || key === 'walk' || key === 'run' ? 40 : 1;
       if (Array.isArray(T[key])) for (let i = 0; i < 4; i++) {
-        P[key][i] = ease(P[key][i], T[key][i], 11, dt);
-        gap = Math.max(gap, Math.abs(T[key][i] - P[key][i]));
+        [P[key][i], PV[key][i]] = spring(P[key][i], PV[key][i], T[key][i], 15, dt);
+        gap = Math.max(gap, Math.abs(T[key][i] - P[key][i]), Math.abs(PV[key][i]) * 0.1);
       } else {
-        P[key] = ease(P[key], T[key], key === 'blink' ? 38 : key === 'walk' || key === 'run' ? 7 : 9, dt);
-        gap = Math.max(gap, Math.abs(T[key] - P[key]) * (key === 'blink' || key === 'walk' || key === 'run' ? 40 : 1));
+        [P[key], PV[key]] = spring(P[key], PV[key], T[key], RATE[key] || 12.5, dt);
+        gap = Math.max(gap, (Math.abs(T[key] - P[key]) + Math.abs(PV[key]) * 0.1) * big);
       }
     }
     return gap;
@@ -381,7 +395,8 @@
     const k = (window.__kedi && window.__kedi.cat) || { speed: 30 };
     targets();
     const gap = settle(dt);
-    phase = (phase + dt * lerp(1.5, 3.2, P.run) * (0.4 + 0.6 * P.walk) * (k.speed > 0 ? clamp(k.speed / 34, 0.8, 1.6) : 1)) % 1;
+    const vel = k.vel != null ? k.vel : k.speed;
+    phase = (phase + dt * lerp(1.5, 3.2, P.run) * (0.4 + 0.6 * P.walk) * (vel > 0 ? clamp(vel / 34, 0.5, 1.6) : 1)) % 1;
     deform();
     draw2d();
     return gap > 0.6;

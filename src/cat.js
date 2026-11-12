@@ -37,7 +37,14 @@
   save();
 
   // ---- kedi ----
-  const cat = { x: 70, y: 0, vy: 0, dir: 1, mode: 'idle', target: null, speed: 30, onArrive: null, busyUntil: 0 };
+  // vx: gerçek yatay hız (hızlanma/yavaşlama ile), vel: |vx| (iskelet adım hızı için)
+  const cat = { x: 70, y: 0, vx: 0, vel: 0, vy: 0, dir: 1, mode: 'idle', target: null, speed: 30, onArrive: null, busyUntil: 0 };
+  // dönüş animasyonu: s = görünen yön (-1..1), t = ilerleme (0..1)
+  const turn = { s: 1, from: 1, to: 1, t: 1 };
+  const TURN_DUR = 0.3;
+  const ACC = 260;        // kalkış ivmesi (px/s²)
+  const DEC = 420;        // fren (dur komutu, yön değişimi)
+  const ARRIVE = 150;     // hedefe yaklaşırken yavaş yavaş süzülerek durma
   let now = performance.now();
   let lastInteract = Date.now();
   const touch = () => { lastInteract = Date.now(); };
@@ -51,7 +58,8 @@
     cat.onArrive = cb;
     catEl.style.setProperty('--wd', speed > 70 ? '.24s' : speed > 45 ? '.32s' : '.46s');
   }
-  function stopWalk() { cat.target = null; cat.onArrive = null; pose('walk', false); }
+  // hedefi bırakır; kedi kayarak değil birkaç pikselde yavaşlayarak durur
+  function stopWalk() { cat.target = null; cat.onArrive = null; }
   function jump(v = -200) { if (cat.y === 0) cat.vy = v; }
 
   // ---- efektler ----
@@ -78,6 +86,18 @@
     clearTimeout(bubbleT);
     bubbleT = setTimeout(() => bubbleEl.classList.remove('on'), ms);
   }
+
+  // ---- etkinlik zamanlayıcıları ----
+  // Bir etkinliğe (yemek, yumak, lazer...) ait gecikmeli işler buradan kurulur.
+  // Yeni etkinlik başlayınca endActivities() hepsini iptal eder; böylece eski
+  // etkinliğin geç kalan bir adımı yenisinin durumunu bozamaz.
+  const actTimers = new Set();
+  function later(ms, fn) {
+    const id = setTimeout(() => { actTimers.delete(id); fn(); }, ms);
+    actTimers.add(id);
+    return id;
+  }
+  function cancelLater() { actTimers.forEach(clearTimeout); actTimers.clear(); }
 
   // ---- göz kırpma & kulak ----
   (function blinkLoop() {
@@ -150,8 +170,8 @@
       cat.mode = 'idle';
       cat.dir = face;
       yarn.fadeAt = now + 9000;
-      pose('happy'); hearts(4); setTimeout(() => pose('happy', false), 1800);
-      if (Math.random() < 0.5) setTimeout(() => bubble('çok eğlendim! 🧶'), 400);
+      pose('happy'); hearts(4); later(1800, () => pose('happy', false));
+      if (Math.random() < 0.5) later(400, () => bubble('çok eğlendim! 🧶'));
       return;
     }
 
@@ -184,11 +204,11 @@
   function batYarn(face) {
     cat.busyUntil = now + 800;
     pose('crouch', true);
-    setTimeout(() => {
+    later(260, () => {
       pose('bat', true);
       if (yarn.on && Math.abs(yarn.x - cat.x) < 40) { kickYarn(face); yarn.bats++; }
-    }, 260);
-    setTimeout(() => { pose('bat', false); pose('crouch', false); }, 560);
+    });
+    later(560, () => { pose('bat', false); pose('crouch', false); });
   }
 
   // ====================================================
@@ -202,24 +222,23 @@
     bowlEl.style.left = bowlX + 'px';
     bowlEl.classList.add('on', 'full');
     cat.mode = 'food';
-    setTimeout(() => {
-      if (cat.mode !== 'food') return;
+    later(450, () => {
       walkTo(bowlX - MOUTH_DX, 48, () => {
         if (cat.mode !== 'food') return;
         cat.dir = 1;
         cat.mode = 'eat';
         pose('eat');
-        setTimeout(() => {
+        later(3800, () => {
           pose('eat', false);
           bowlEl.classList.remove('full');
           store.tokluk = 100; save();
           cat.mode = 'idle';
           pose('happy'); hearts(5);
-          setTimeout(() => { pose('happy', false); bubble(Math.random() < .5 ? 'mmm, nefisti 😋' : 'karnım doydu 😽'); }, 900);
-          setTimeout(() => bowlEl.classList.remove('on'), 3200);
-        }, 3800);
+          later(900, () => { pose('happy', false); bubble(Math.random() < .5 ? 'mmm, nefisti 😋' : 'karnım doydu 😽'); });
+          later(3200, () => bowlEl.classList.remove('on'));
+        });
       });
-    }, 450);
+    });
   }
 
   // ====================================================
@@ -243,12 +262,12 @@
     pose('crouch', false); pose('lookup', false);
     if (cat.mode === 'laser') cat.mode = 'idle';
   }
+  // süre dolunca: mutlu bitiş
+  function finishLaser() {
+    stopLaser(); stopWalk();
+    pose('happy'); hearts(3); later(1500, () => pose('happy', false));
+  }
   function laserThink() {
-    if (now > laser.until) {
-      stopLaser(); stopWalk();
-      pose('happy'); hearts(3); setTimeout(() => pose('happy', false), 1500);
-      return;
-    }
     if (!laser.visible) { stopWalk(); pose('crouch', false); pose('lookup', false); return; }
     if (now < cat.busyUntil) return;
     const dx = laser.x - cat.x;
@@ -294,16 +313,16 @@
     menuBtn('sleep', false, '🌙');
   }
 
+  // Yeni bir etkinlikten önce her şeyi temiz bir duruma getirir.
   function endActivities() {
+    cancelLater();
     stopLaser();
     if (yarn.on && !yarn.fadeAt) yarn.fadeAt = now + 600;
-    if (cat.mode === 'food' || cat.mode === 'eat') {
-      pose('eat', false);
-      bowlEl.classList.remove('on', 'full');
-    }
-    if (cat.mode === 'tobed') { stopWalk(); menuBtn('sleep', false, '🌙'); }
+    bowlEl.classList.remove('on', 'full');
+    if (cat.mode === 'tobed') menuBtn('sleep', false, '🌙');
     if (cat.mode !== 'sleep') cat.mode = 'idle';
-    pose('crouch', false); pose('lookup', false); pose('bat', false); pose('groom', false);
+    stopWalk();
+    for (const p of ['eat', 'crouch', 'lookup', 'bat', 'groom', 'happy']) pose(p, false);
     cat.busyUntil = 0;
   }
 
@@ -332,9 +351,9 @@
     const r = Math.random();
     if (r < 0.55) walkTo(rand(MIN_X, MAX_X), rand(24, 34));
     else if (r < 0.75) cat.dir *= -1;
-    else if (r < 0.85) { pose('lookup'); setTimeout(() => pose('lookup', false), 1400); }
+    else if (r < 0.85) { pose('lookup'); later(1400, () => pose('lookup', false)); }
     else if (r < 0.92) { jump(-150); }
-    else { stopWalk(); pose('groom'); nextWander = now + 4200; setTimeout(() => pose('groom', false), 2600); }
+    else { stopWalk(); pose('groom'); nextWander = now + 4200; later(2600, () => pose('groom', false)); }
   }
 
   // ====================================================
@@ -365,7 +384,7 @@
   const BUSY_POSES = ['walk', 'happy', 'crouch', 'bat', 'groom', 'eat', 'land', 'lookup', 'blink', 'twitch'];
   let rigBusy = true;
   function targetFps() {
-    if (rigBusy || dragging || laser.on || yarn.on || cat.target != null || cat.y < 0 || cat.vy !== 0) return 60;
+    if (rigBusy || dragging || laser.on || yarn.on || cat.target != null || cat.vx !== 0 || turn.t < 1 || cat.y < 0 || cat.vy !== 0) return 60;
     if (cat.mode !== 'idle' && cat.mode !== 'sleep') return 60;
     for (const p of BUSY_POSES) if (posed(p)) return 60;
     return cat.mode === 'sleep' ? 15 : 30;
@@ -422,18 +441,44 @@
       cat.vy += G * dt; cat.y += cat.vy * dt;
       if (cat.y >= 0) { if (cat.vy > 120) { pose('land'); setTimeout(() => pose('land', false), 120); } cat.y = 0; cat.vy = 0; }
     }
-    // yürüme
-    if (cat.target != null && cat.mode !== 'sleep' && cat.mode !== 'eat') {
+    // yürüme: yumuşak kalkış, hedefe yaklaşırken yavaşlama, ters yöne gitmeden önce durup dönme
+    const canWalk = cat.mode !== 'sleep' && cat.mode !== 'eat';
+    let want = 0;                                   // istenen hız (işaretli)
+    if (cat.target != null && canWalk) {
       const d = cat.target - cat.x;
-      if (Math.abs(d) < 1) {
-        cat.x = cat.target; cat.target = null; pose('walk', false);
+      if (Math.abs(d) < 0.8 && Math.abs(cat.vx) < 40) {
+        cat.x = cat.target; cat.vx = 0; cat.target = null;
         const cb = cat.onArrive; cat.onArrive = null; cb && cb();
-      } else {
-        cat.dir = sign(d);
-        cat.x += sign(d) * Math.min(Math.abs(d), cat.speed * dt);
-        pose('walk', cat.y === 0);
+      } else if (sign(d) !== cat.dir) {
+        if (Math.abs(cat.vx) < 12) cat.dir = sign(d);   // yavaşladıysa dön
+      } else if (turn.t > 0.55) {                       // dönüşün yarısından sonra yürümeye başla
+        want = sign(d) * Math.max(8, Math.min(cat.speed, Math.sqrt(2 * ARRIVE * Math.abs(d))));
       }
     }
+    if (!canWalk) cat.vx = 0;
+    else {
+      const speeding = want !== 0 && (cat.vx === 0 || sign(want) === sign(cat.vx)) && Math.abs(want) > Math.abs(cat.vx);
+      const rate = (speeding ? ACC : DEC) * (cat.y < 0 ? 0.15 : 1) * dt;   // havadayken hız pek değişmez
+      cat.vx += clamp(want - cat.vx, -rate, rate);
+      const nx = cat.x + cat.vx * dt;
+      if (cat.target != null && sign(cat.target - nx) !== sign(cat.target - cat.x)) { cat.x = cat.target; cat.vx = 0; }
+      else cat.x = nx;
+      if (cat.x < MIN_X || cat.x > MAX_X) { cat.x = clamp(cat.x, MIN_X, MAX_X); cat.vx = 0; }
+    }
+    cat.vel = Math.abs(cat.vx);
+    pose('walk', cat.y === 0 && cat.vel > 2);
+
+    // dönüş: yön değişince görünen yön 0.3 sn'de yumuşakça çevrilir
+    if (cat.dir !== turn.to) { turn.from = turn.s; turn.to = cat.dir; turn.t = 0; }
+    if (turn.t < 1) {
+      turn.t = Math.min(1, turn.t + dt / TURN_DUR);
+      const e = turn.t < 0.5 ? 4 * turn.t ** 3 : 1 - (-2 * turn.t + 2) ** 3 / 2;   // easeInOutCubic
+      turn.s = turn.from + (turn.to - turn.from) * e;
+    }
+
+    // laser her durumda kendi süresini kontrol eder (başka bir etkinlik modu değiştirse bile)
+    if (laser.on && cat.mode !== 'laser') stopLaser();
+    else if (laser.on && now > laser.until) finishLaser();
 
     updateYarn(dt);
     if (cat.mode === 'play') playThink();
@@ -442,10 +487,13 @@
 
     // çiz
     setStyle(catEl, 'transform', `translate(${(cat.x - CAT_W / 2).toFixed(2)}px, ${(FLOOR - CAT_H + cat.y).toFixed(2)}px)`);
-    setStyle(catInner, 'transform', `scaleX(${cat.dir})`);
+    // dönüşte en dar hâlde bile %22 genişlikte kalır (çizgiye dönüşmesin); ortada hafif çömelme
+    const tm = Math.abs(turn.s), mid = turn.t < 1 ? Math.sin(Math.PI * turn.t) : 0;
+    const sx = (turn.s < 0 || (turn.s === 0 && turn.to < 0) ? -1 : 1) * (0.22 + 0.78 * tm);
+    setStyle(catInner, 'transform', `scale(${sx.toFixed(3)}, ${(1 - 0.05 * mid).toFixed(3)})`);
     rigBusy = window.__catTick ? !!window.__catTick(dt) : false;
     const sh = 1 + cat.y / 90;
-    setStyle(shadowEl, 'transform', `translate(${cat.x.toFixed(2)}px, ${FLOOR - 1}px) scale(${sh.toFixed(3)})`);
+    setStyle(shadowEl, 'transform', `translate(${cat.x.toFixed(2)}px, ${FLOOR - 1}px) scale(${(sh * (0.8 + 0.2 * tm)).toFixed(3)}, ${sh.toFixed(3)})`);
     setStyle(shadowEl, 'opacity', ((cat.mode === 'sleep' ? 0.6 : 1) * (0.5 + 0.5 * sh)).toFixed(3));
     yarnShadowEl.classList.toggle('on', yarn.on && !yarn.fadeAt);
     if (yarn.on) setStyle(yarnShadowEl, 'transform', `translate(${yarn.x.toFixed(2)}px, ${FLOOR - 1}px) scale(${(0.55 + 0.45 * Math.max(0, 1 - (FLOOR - yarn.r - yarn.y) / 110)).toFixed(3)})`);
@@ -495,7 +543,8 @@
     down = null;
     if (dragging) { dragging = false; api && api.dragEnd(); return; }
     touch();
-    if (laser.on) return;
+    // lazer açıkken tıklamak lazeri kapatır (menüye ulaşılamadığı için tek çıkış yolu buydu)
+    if (laser.on) { stopLaser(); stopWalk(); bubble('oyun bitti 🐾', 1400); return; }
     if (yarn.on && yarnEl.contains(t)) {
       kickYarn(sign(yarn.x - cat.x) || 1);
       if (cat.mode !== 'play') { wake(); cat.mode = 'play'; yarn.fadeAt = 0; yarn.born = now; yarn.bats = 0; yarn.goal = Math.round(rand(4, 6)); }
@@ -515,7 +564,8 @@
       const side = api ? await api.menu(true) : 'right';
       app.classList.toggle('side-left', side === 'left');
       app.classList.toggle('side-right', side !== 'left');
-      requestAnimationFrame(() => menuEl.classList.add('open'));
+      // pencere genişlerken menü kapatıldıysa yeniden açma
+      requestAnimationFrame(() => { if (menuOpen) menuEl.classList.add('open'); });
     } else {
       menuEl.classList.remove('open');
       setTimeout(() => { if (!menuOpen && api) api.menu(false).then(() => app.classList.replace('side-left', 'side-right')); }, 180);
@@ -540,7 +590,7 @@
     if (api && api.setScale) markScale(await api.setScale(s));
     else document.documentElement.style.zoom = s;   // tarayıcıda deneme için
   }));
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSettings(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSettings(); stopLaser(); } });
   if (api && api.getScale) api.getScale().then(markScale);
   if (api && api.onScale) api.onScale(markScale);
   markScale(1);
@@ -586,5 +636,5 @@
   }, 900);
 
   // test için dışarı aç
-  window.__kedi = { cat, yarn, laser, store, dropYarn, feed, startLaser, sleep, wake, purr, setMenu, bubble };
+  window.__kedi = { cat, turn, yarn, laser, store, dropYarn, feed, startLaser, stopLaser, sleep, wake, purr, setMenu, bubble };
 })();

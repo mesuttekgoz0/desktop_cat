@@ -87,7 +87,8 @@ html, body {
 
 /* ================= KEDİ ================= */
 .cat { z-index: 2; position: absolute; left: 0; top: 0; width: 64px; height: 64px; will-change: transform; }
-#catInner { width: 100%; height: 100%; transform-origin: 50% 50%; transition: transform .18s ease; }
+/* dönüş cat.js'de kare kare çiziliyor; pivot = gövde ortası, patiler (alt kenar) yerde kalır */
+#catInner { width: 100%; height: 100%; transform-origin: 50% 100%; }
 #catSvg { width: 100%; height: 100%; overflow: visible; display: block; }
 #catSvg g, #catSvg path, #catSvg ellipse { transition: transform .22s ease, opacity .2s; }
 
