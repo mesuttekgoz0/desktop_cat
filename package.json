@@ -1,0 +1,49 @@
+{
+  "name": "kedicik",
+  "productName": "Kedicik",
+  "version": "1.0.0",
+  "description": "Masaüstünde yaşayan küçük kedi",
+  "main": "main.js",
+  "author": "Mesut",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:win": "electron-builder --win portable --publish never"
+  },
+  "devDependencies": {
+    "electron": "^45.3.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.mesut.kedicik",
+    "productName": "Kedicik",
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**",
+      "assets/**"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["universal"]
+        }
+      ],
+      "category": "public.app-category.entertainment",
+      "icon": "build/icon.png",
+      "identity": "-",
+      "notarize": false,
+      "extendInfo": {
+        "LSUIElement": true
+      }
+    },
+    "dmg": {
+      "title": "Kedicik"
+    },
+    "win": {
+      "icon": "build/icon.png"
+    }
+  }
+}

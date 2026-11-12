@@ -1,0 +1,344 @@
+:root {
+  --fur-hi: #ffd7a8; --fur: #f9b46f; --fur-dark: #e88f4c; --line: #b8683a;
+  --belly: #fff4e6; --stripe: #e98740; --eye: #3a2a24; --iris: #8a5a3c; --nose: #f48ba0;
+}
+:root[data-renk="gri"]   { --fur-hi:#e6eaf1; --fur:#c3cad6; --fur-dark:#9aa3b3; --line:#79819a; --belly:#f7f8fb; --stripe:#98a1b2; --iris:#5a7fa8; }
+:root[data-renk="siyah"] { --fur-hi:#5d5866; --fur:#3d3943; --fur-dark:#28252d; --line:#1e1c22; --belly:#5a5462; --stripe:transparent; --eye:#2a3a10; --iris:#d6c23a; --nose:#e08aa0; }
+:root[data-renk="beyaz"] { --fur-hi:#ffffff; --fur:#fdf9f4; --fur-dark:#eadfd3; --line:#c7b3a2; --belly:#ffffff; --stripe:transparent; --iris:#5b8fd0; --eye:#24324a; }
+:root[data-renk="tekir"] { --fur-hi:#e3c4a2; --fur:#c9a07a; --fur-dark:#a47b58; --line:#7d5a40; --belly:#f6ebde; --stripe:#7a5638; --iris:#7a9a3a; }
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; overflow: hidden;
+  background: transparent;
+  user-select: none; -webkit-user-select: none;
+  font-family: -apple-system, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif;
+}
+#app { position: relative; width: 186px; height: 140px; }
+
+/* ================= YUVA ================= */
+#nest {
+  position: absolute; top: 0; left: 0;
+  width: 140px; height: 140px;
+  border-radius: 34px;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 50% 0%, #fff8f2 0%, rgba(255,248,242,0) 60%),
+    linear-gradient(180deg, #ffeee3 0%, #fbdccc 100%);
+  box-shadow: inset 0 0 0 2.5px rgba(255,255,255,.8);
+  cursor: pointer;
+}
+.side-left #nest { left: 46px; }
+#nest[data-time="dusk"]  { background: radial-gradient(120% 80% at 50% 0%, #fff1ea 0%, rgba(255,241,234,0) 60%), linear-gradient(180deg, #fbe4dc 0%, #f3cfc6 100%); }
+#nest[data-time="night"] { background: radial-gradient(120% 80% at 30% 20%, #f4effa 0%, rgba(244,239,250,0) 60%), linear-gradient(180deg, #e7def2 0%, #d6cae8 100%); }
+#nest.dim::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(60% 50% at 28% 82%, rgba(255,220,170,.18), rgba(50,35,95,.18));
+}
+
+.window-sky {
+  position: absolute; top: 15px; left: 15px; width: 38px; height: 32px;
+  border-radius: 10px; overflow: hidden;
+  border: 3px solid #fff;
+  background: linear-gradient(180deg, #8ecbf5, #d5eeff);
+  box-shadow: 0 2px 4px rgba(190,120,90,.15);
+}
+.window-sky::after { content:""; position:absolute; left:50%; top:0; bottom:0; width:2px; margin-left:-1px; background:#fff; z-index: 2; }
+.curtain { position:absolute; top:-2px; width:9px; height:34px; background: linear-gradient(90deg,#f9c6d2,#f4adc0); z-index:3; }
+.curtain.l { left:-3px; border-radius: 0 0 8px 0; }
+.curtain.r { right:-3px; border-radius: 0 0 0 8px; background: linear-gradient(270deg,#f9c6d2,#f4adc0); }
+.sun  { position:absolute; width:11px; height:11px; border-radius:50%; background:#ffd45e; left:14px; top:7px; box-shadow:0 0 6px #ffe7a3; }
+.moon { position:absolute; width:10px; height:10px; border-radius:50%; left:12px; top:6px; box-shadow: 3px -2px 0 0 #fff5c4; display:none; }
+.star { position:absolute; width:2px; height:2px; background:#fff; border-radius:50%; display:none; }
+.star.a{ left:22px; top:6px } .star.b{ left:24px; top:18px } .star.c{ left:9px; top:20px }
+#nest[data-time="dusk"]  .window-sky { background: linear-gradient(180deg, #f5a49e, #ffd7a5); }
+#nest[data-time="dusk"]  .sun { top: 17px; background:#ffb066; }
+#nest[data-time="night"] .window-sky { background: linear-gradient(180deg, #2c3166, #4c4a8a); }
+#nest[data-time="night"] .sun { display:none; }
+#nest[data-time="night"] .moon, #nest[data-time="night"] .star { display:block; }
+
+.frame {
+  position: absolute; top: 19px; right: 20px; width: 24px; height: 21px;
+  border-radius: 6px; background: #fff; border: 2px solid #f3c7b5;
+  display: grid; place-items: center;
+  box-shadow: 0 2px 3px rgba(190,120,90,.12);
+}
+.frame svg { width: 13px; height: 12px; }
+.frame path { fill: #f38fa4; }
+
+.floor {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 34px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 34px, rgba(160,95,60,.10) 34px 35.5px),
+    linear-gradient(180deg, #f0c9a3, #e5b48b);
+  box-shadow: 0 -1.5px 0 rgba(255,255,255,.65);
+}
+
+.bed { position: absolute; left: 6px; bottom: 6px; width: 64px; height: 28px; pointer-events: none; }
+
+.shadow {
+  position: absolute; left: 0; top: 0; width: 46px; height: 8px; margin: -4px 0 0 -23px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(150,80,50,.26), rgba(150,80,50,0));
+  pointer-events: none; will-change: transform;
+}
+.shadow.small { width: 18px; height: 5px; margin: -2.5px 0 0 -9px; opacity: 0; transition: opacity .5s; }
+.shadow.small.on { opacity: 1; }
+
+/* ================= KEDİ ================= */
+.cat { z-index: 2; position: absolute; left: 0; top: 0; width: 64px; height: 64px; will-change: transform; }
+#catInner { width: 100%; height: 100%; transform-origin: 50% 50%; transition: transform .18s ease; }
+#catSvg { width: 100%; height: 100%; overflow: visible; display: block; }
+#catSvg g, #catSvg path, #catSvg ellipse { transition: transform .22s ease, opacity .2s; }
+
+.headshape, .ear .fur { fill: url(#gHead); stroke: var(--line); stroke-width: 1.7; stroke-linejoin: round; }
+.body { fill: url(#gBody); stroke: var(--line); stroke-width: 1.7; stroke-linejoin: round; }
+.inner { fill: url(#gInner); }
+.belly { fill: var(--belly); opacity: .92; }
+.muzzle { fill: var(--belly); opacity: .9; }
+.stripe { fill: none; stroke: var(--stripe); stroke-width: 2.8; stroke-linecap: round; opacity: .75; }
+.fluff { fill: none; stroke: var(--line); stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; opacity: .7; }
+.paw ellipse { fill: var(--fur-hi); stroke: var(--line); stroke-width: 1.5; }
+.paw path { fill: none; stroke: var(--line); stroke-width: 1; stroke-linecap: round; opacity: .5; }
+.tail-o { fill: none; stroke: var(--line); stroke-width: 10.5; stroke-linecap: round; }
+.tail-f { fill: none; stroke: var(--fur); stroke-width: 7; stroke-linecap: round; }
+.tail-tip { fill: none; stroke: var(--fur-dark); stroke-width: 6; stroke-linecap: round; }
+.tail-wrap { opacity: 0; }
+.tw-o { fill: none; stroke: var(--line); stroke-width: 9.5; stroke-linecap: round; }
+.tw-f { fill: none; stroke: var(--fur); stroke-width: 6.2; stroke-linecap: round; }
+.eyeball { fill: url(#gEye); }
+.hl { fill: #fff; }
+.hl2 { fill: #fff; opacity: .9; }
+.eye-closed, .eye-sleep { fill: none; stroke: var(--eye); stroke-width: 2.2; stroke-linecap: round; opacity: 0; }
+.blush { fill: url(#gBlush); opacity: .75; }
+.nose { fill: var(--nose); }
+.mouth { fill: none; stroke: var(--line); stroke-width: 1.5; stroke-linecap: round; }
+.tongue { fill: #f27d97; opacity: 0; }
+.whisk { fill: none; stroke: var(--line); stroke-width: .9; stroke-linecap: round; opacity: .4; }
+
+/* pivotlar */
+#all   { transform-box: view-box; transform-origin: 50px 97px; }
+#bodyG { transform-box: view-box; transform-origin: 50px 97px; animation: breathe 3.4s ease-in-out infinite; }
+#head  { transform-box: view-box; transform-origin: 50px 72px; animation: headIdle 5s ease-in-out infinite; }
+#tail  { transform-box: view-box; transform-origin: 33px 86px; animation: tail 3.6s ease-in-out infinite; }
+#eyes  { transform: translateX(1.8px); }
+.eye   { transform-box: fill-box; transform-origin: 50% 55%; }
+.ear   { transform-box: fill-box; transform-origin: 50% 100%; }
+.paw   { transform-box: fill-box; transform-origin: 50% 50%; }
+
+@keyframes breathe  { 0%,100% { transform: scale(1,1); } 50% { transform: scale(1.015,1.03); } }
+@keyframes headIdle { 0%,100% { transform: rotate(0); } 30% { transform: rotate(2.5deg); } 65% { transform: rotate(-1.5deg); } }
+@keyframes tail     { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(10deg); } }
+@keyframes tailFast { 0%,100% { transform: rotate(-14deg); } 50% { transform: rotate(14deg); } }
+@keyframes hop {
+  0%,100% { transform: translateY(0) scale(1.05,.95); }
+  15%     { transform: translateY(0) scale(.97,1.04); }
+  50%     { transform: translateY(-5px) scale(.98,1.03); }
+  85%     { transform: translateY(0) scale(1.06,.94); }
+}
+@keyframes pawA { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2.6px); } }
+@keyframes chomp { 0%,100% { transform: translateY(7px) rotate(0); } 50% { transform: translateY(9px) rotate(1.5deg); } }
+@keyframes lick  { 0%,100% { transform: translate(-6px,-30px) rotate(-20deg); } 50% { transform: translate(-6px,-27px) rotate(-12deg); } }
+@keyframes groomHead { 0%,100% { transform: rotate(-9deg) translateY(1px); } 50% { transform: rotate(-12deg) translateY(2px); } }
+@keyframes purrBounce { 0%,100% { transform: scale(1,1); } 50% { transform: scale(1.03,.975); } }
+
+/* yürüme: tavşan gibi minik zıplamalar */
+.cat.walk #all { animation: hop var(--wd, .42s) ease-in-out infinite; }
+.cat.walk .pawL { animation: pawA var(--wd, .42s) ease-in-out infinite; }
+.cat.walk .pawR { animation: pawA var(--wd, .42s) ease-in-out infinite calc(var(--wd, .42s) / -2); }
+.cat.walk #tail { animation: tailFast .7s ease-in-out infinite; }
+
+/* göz kırpma, kulak oynatma */
+.cat.blink .eye { transform: scaleY(.07); }
+.cat.twitch .ear-l { transform: rotate(-14deg); }
+.cat.twitch .ear-r { transform: rotate(6deg); }
+
+/* mutlu / mırlama */
+.cat.happy .eye { opacity: 0; }
+.cat.happy .eye-closed { opacity: 1; }
+.cat.happy .blush { opacity: 1; }
+.cat.happy .tongue { opacity: 0; }
+.cat.happy #all { animation: purrBounce .5s ease-in-out infinite; }
+.cat.happy #tail { animation: tailFast .8s ease-in-out infinite; }
+
+/* yukarı bakma */
+.cat.lookup #eyes { transform: translate(1.8px, -3px); }
+.cat.lookup #head { animation: none; transform: rotate(-4deg) translateY(-1px); }
+
+/* sinsice çömelme, pati atma */
+.cat.crouch #all { animation: none; transform: scale(1.07,.9); }
+.cat.crouch .ear-l { transform: rotate(-22deg); }
+.cat.crouch .ear-r { transform: rotate(22deg); }
+.cat.crouch #tail { animation: tailFast .4s ease-in-out infinite; }
+.cat.crouch #eyes { transform: translate(2.5px, 0) scale(1.05); }
+.cat.bat .pawR { animation: none; transform: translate(9px,-17px) rotate(-25deg) scale(1.1); transition: transform .09s; }
+.cat.bat #head { animation: none; transform: rotate(5deg); }
+
+/* yalanma */
+.cat.groom .pawR { transform: translate(-6px,-30px) rotate(-20deg); animation: lick .45s ease-in-out infinite; }
+.cat.groom #head { animation: groomHead .45s ease-in-out infinite; }
+.cat.groom .eye { opacity: 0; }
+.cat.groom .eye-closed { opacity: 1; }
+.cat.groom .tongue { opacity: 1; }
+
+/* yere iniş */
+.cat.land #all { animation: none; transform: scale(1.1,.86); transition: transform .08s; }
+
+/* yemek */
+.cat.eat #head { animation: chomp .34s ease-in-out infinite; }
+.cat.eat .eye { opacity: 0; }
+.cat.eat .eye-closed { opacity: 1; }
+.cat.eat .tongue { opacity: 1; }
+
+/* uyku: somun pozisyonu */
+.cat.sleep .paw { opacity: 0; }
+.cat.sleep #tail { opacity: 0; }
+.cat.sleep .tail-wrap { opacity: 1; }
+.cat.sleep #bodyG { animation: breathe 4.6s ease-in-out infinite; }
+.cat.sleep #all { transform: translateY(2px) scale(1.05,.9); }
+.cat.sleep #head { animation: none; transform: translateY(9px) rotate(-7deg); }
+.cat.sleep .eye { opacity: 0; }
+.cat.sleep .eye-sleep { opacity: 1; }
+.cat.sleep .ear-l { transform: rotate(-10deg); }
+.cat.sleep .ear-r { transform: rotate(10deg); }
+
+.zzz { position: absolute; left: 44px; top: 4px; pointer-events: none; opacity: 0; transition: opacity .4s; }
+.cat.sleep .zzz { opacity: 1; }
+.zzz span {
+  position: absolute; font-weight: 800; color: #9a8acb; font-size: 9px;
+  animation: zz 2.4s ease-in infinite; opacity: 0;
+}
+.zzz span:nth-child(2) { animation-delay: .8s; font-size: 10px; }
+.zzz span:nth-child(3) { animation-delay: 1.6s; font-size: 12px; }
+@keyframes zz { 0% { transform: translate(0,6px); opacity: 0; } 25% { opacity: 1; } 100% { transform: translate(10px,-16px); opacity: 0; } }
+
+/* ================= YUMAK ================= */
+#yarn {
+  position: absolute; left: 0; top: 0; width: 17px; height: 17px;
+  opacity: 0; pointer-events: none; transition: opacity .6s;
+  will-change: transform;
+}
+#yarn.on { opacity: 1; pointer-events: auto; cursor: grab; }
+#yarn svg { width: 100%; height: 100%; overflow: visible; display: block; filter: drop-shadow(0 .5px .5px rgba(160,60,90,.35)); }
+.y-line { fill: none; stroke: #ffd3de; stroke-width: 1.1; stroke-linecap: round; opacity: .85; }
+.y-thread { fill: none; stroke: #e2708e; stroke-width: 1.2; stroke-linecap: round; }
+
+/* ================= MAMA ================= */
+#bowl {
+  position: absolute; bottom: 7px; z-index: 3; left: 0; width: 28px; height: 15px; margin-left: -14px;
+  opacity: 0; transform: translateY(6px); transition: opacity .35s, transform .35s;
+  pointer-events: none;
+}
+#bowl.on { opacity: 1; transform: translateY(0); }
+#bowl svg { width: 100%; height: 100%; display: block; overflow: visible; filter: drop-shadow(0 1px 1px rgba(70,110,160,.3)); }
+.bowl-b { fill: url(#gBowl); }
+.bowl-h { stroke: rgba(255,255,255,.7); stroke-width: 1.4; stroke-linecap: round; }
+.bowl-fish { fill: #fff; opacity: .8; }
+.kibble circle { fill: #d0925a; stroke: #a8693a; stroke-width: .6; }
+.kibble { transition: opacity .6s, transform .6s; transform-box: fill-box; transform-origin: 50% 100%; }
+#bowl:not(.full) .kibble { opacity: 0; transform: scaleY(.2); }
+
+/* ================= LAZER ================= */
+#laser {
+  position: absolute; left: 0; top: 0; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%; background: #ff2a3c;
+  box-shadow: 0 0 4px 2px rgba(255,40,60,.55), 0 0 10px 4px rgba(255,40,60,.25);
+  opacity: 0; pointer-events: none; transition: opacity .15s;
+}
+#laser.on { opacity: 1; }
+#app.laser-on #nest { cursor: none; }
+
+/* ================= EFEKTLER ================= */
+#fx { position: absolute; inset: 0; pointer-events: none; }
+.heart { position: absolute; width: 10px; height: 9px; margin-left: -5px; animation: heart 1.4s ease-out forwards; }
+.heart path { fill: #f4708e; }
+@keyframes heart {
+  0% { transform: translate(0, 0) scale(.4); opacity: 0; }
+  20% { opacity: 1; transform: translate(calc(var(--dx) * .2), -6px) scale(1); }
+  100% { transform: translate(var(--dx), -34px) scale(.8); opacity: 0; }
+}
+
+#bubble {
+  position: absolute; left: 70px; bottom: 78px;
+  width: max-content; max-width: 126px; padding: 4px 8px;
+  background: #fff; color: #5a3d30;
+  border-radius: 10px;
+  font-size: 10.5px; font-weight: 600; line-height: 1.25; text-align: center;
+  box-shadow: 0 1px 4px rgba(150,80,50,.2);
+  transform: translateX(-50%) translateY(4px) scale(.9);
+  opacity: 0; pointer-events: none;
+  transition: opacity .25s, transform .25s;
+}
+#bubble.on { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+
+/* ================= MENÜ ================= */
+#menu {
+  position: absolute; top: 0; left: 148px; width: 38px; height: 140px;
+  display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px;
+  pointer-events: none;
+}
+.side-left #menu { left: 0; }
+#menu button {
+  width: 25px; height: 25px; border-radius: 50%;
+  border: none; padding: 0; margin: 0;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(110,60,40,.22), inset 0 0 0 1.5px #fbe1d4;
+  font-size: 13px; line-height: 25px; text-align: center;
+  cursor: pointer;
+  opacity: 0; transform: scale(.4) translateX(-14px);
+  transition: transform .22s cubic-bezier(.3,1.6,.5,1), opacity .18s, background .15s;
+}
+.side-left #menu button { transform: scale(.4) translateX(14px); }
+#menu.open { pointer-events: auto; }
+#menu.open button { opacity: 1; transform: scale(1) translateX(0); }
+#menu.open button:nth-child(2) { transition-delay: .04s; }
+#menu.open button:nth-child(3) { transition-delay: .08s; }
+#menu.open button:nth-child(4) { transition-delay: .12s; }
+#menu.open button:nth-child(5) { transition-delay: .16s; }
+#menu button:hover { background: #fff4ee; transform: scale(1.08); transition-delay: 0s; }
+#menu button:active { transform: scale(.94); }
+#menu button.active { background: #ffe3ea; }
+
+/* iskeletli kedi yüklenince çizim kediyi gizle */
+.rig-mode #catSvg { display: none; }
+
+/* ================= AYARLAR ================= */
+#settings {
+  position: absolute; top: 0; left: 0; width: 140px; height: 140px;
+  border-radius: 34px; padding: 12px 14px 14px;
+  background: rgba(255, 250, 246, .94);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  box-shadow: inset 0 0 0 2.5px rgba(255,255,255,.85);
+  color: #5a3d30;
+  display: flex; flex-direction: column;
+  opacity: 0; transform: scale(.94); pointer-events: none;
+  transition: opacity .18s, transform .18s;
+  z-index: 10;
+}
+.side-left #settings { left: 46px; }
+#settings.open { opacity: 1; transform: scale(1); pointer-events: auto; }
+.st-head { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; font-weight: 800; padding: 0 2px 0 4px; }
+.st-close {
+  width: 20px; height: 20px; border-radius: 50%; border: none; padding: 0;
+  background: #f6e3da; color: #8a5a48; font-size: 10px; line-height: 20px; cursor: pointer;
+}
+.st-close:hover { background: #f1d3c6; }
+.st-label { font-size: 10px; font-weight: 700; color: #a07a68; margin: 6px 0 4px 4px; letter-spacing: .02em; }
+.st-sizes { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.st-sizes button {
+  min-width: 0; height: 34px; border: none; border-radius: 12px; padding: 4px 2px 3px;
+  background: #fff; color: #5a3d30;
+  box-shadow: 0 1px 2px rgba(120,70,50,.15), inset 0 0 0 1.5px #f6e0d5;
+  font: inherit; font-size: 9.5px; font-weight: 700; line-height: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  cursor: pointer;
+  transition: background .15s, box-shadow .15s, transform .1s;
+}
+.st-sizes button:hover { background: #fff6f1; }
+.st-sizes button:active { transform: scale(.96); }
+.st-sizes button i {
+  flex: none; width: 13px; height: 13px; border-radius: 4px;
+  background: #f7b267; transform: scale(var(--s)); opacity: .85;
+}
+.st-sizes button.active { background: #ffe8ee; box-shadow: inset 0 0 0 2px #f4839f; }
+.st-sizes button.active i { background: #f4839f; opacity: 1; }
