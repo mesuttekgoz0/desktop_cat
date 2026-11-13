@@ -179,7 +179,7 @@ function createTray() {
   tray = new Tray(icon);
   tray.setToolTip('Kedicik');
   rebuildTray = () => {
-    const login = app.getLoginItemSettings().openAtLogin;
+    const login = isOpenAtLogin();
     tray.setContextMenu(Menu.buildFromTemplate([
       { label: 'Kediyi göster / gizle', click: () => { if (!win) return; win.isVisible() ? win.hide() : reveal(); } },
       { label: 'Köşeye getir', click: () => { if (!win) return; const p = defaultPos(); win.setPosition(p.x, p.y); savePos(); reveal(); } },
@@ -192,7 +192,7 @@ function createTray() {
         })),
       },
       { type: 'separator' },
-      { label: 'Bilgisayar açılınca başlat', type: 'checkbox', checked: login, click: (item) => { app.setLoginItemSettings({ openAtLogin: item.checked }); rebuildTray(); } },
+      { label: 'Bilgisayar açılınca başlat', type: 'checkbox', checked: login, click: (item) => { setOpenAtLogin(item.checked); rebuildTray(); } },
       { type: 'separator' },
       { label: 'Çıkış', click: () => app.quit() },
     ]));
@@ -200,11 +200,19 @@ function createTray() {
   rebuildTray();
 }
 
+// --- bilgisayar açılınca başlat ---
+// Windows'taki "portable" .exe her açılışta geçici bir klasöre açılır; başlangıç kaydı
+// o geçici yolu değil asıl .exe dosyasını göstermeli (electron-builder bu yolu verir).
+const loginOpts = () =>
+  (process.platform === 'win32' && process.env.PORTABLE_EXECUTABLE_FILE ? { path: process.env.PORTABLE_EXECUTABLE_FILE } : {});
+const isOpenAtLogin = () => app.getLoginItemSettings(loginOpts()).openAtLogin;
+const setOpenAtLogin = (on) => app.setLoginItemSettings({ openAtLogin: on, ...loginOpts() });
+
 // ilk kurulumda otomatik başlatmayı aç
 function firstRunSetup() {
   const flag = path.join(app.getPath('userData'), '.kuruldu');
   if (app.isPackaged && !fs.existsSync(flag)) {
-    app.setLoginItemSettings({ openAtLogin: true });
+    setOpenAtLogin(true);
     try { fs.writeFileSync(flag, '1'); } catch (_) {}
   }
 }
