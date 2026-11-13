@@ -50,7 +50,8 @@ html, body {
 @keyframes dimIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* yatak: arka resim kedinin arkasında, ön kenar kedinin önünde (uyurken içine girmiş gibi) */
-.bed { position: absolute; left: 13px; bottom: 5px; width: 66px; pointer-events: none; }
+/* konum ve boyut cat.js'de (köşedeki derinliğe göre) */
+.bed { position: absolute; pointer-events: none; }
 #bedFront { z-index: 3; display: none; }
 #cat.sleep ~ #bedFront { display: block; }
 
@@ -64,7 +65,8 @@ html, body {
 .shadow.small.on { opacity: 1; }
 
 /* ================= KEDİ ================= */
-.cat { z-index: 2; position: absolute; left: 0; top: 0; width: 64px; height: 64px; will-change: transform; }
+.cat { z-index: 2; position: absolute; left: 0; top: 0; width: 64px; height: 64px; will-change: transform;
+  transform-origin: 32px 64px; }   /* derinlik ölçeği patilerden */
 /* dönüş cat.js'de kare kare çiziliyor; pivot = gövde ortası, patiler (alt kenar) yerde kalır */
 #catInner { width: 100%; height: 100%; transform-origin: 50% 100%; }
 /* arkadan dönüş kareleri: patiler yuvanın zeminine, gövde ortası kedinin x'ine hizalı */
@@ -199,7 +201,7 @@ html, body {
 
 /* ================= YUMAK ================= */
 #yarn {
-  position: absolute; left: 0; top: 0; width: 17px; height: 17px; z-index: 4;
+  position: absolute; left: 0; top: 0; width: 14px; height: 14px; z-index: 4;
   opacity: 0; pointer-events: none; transition: opacity .6s;
   will-change: transform;
 }
@@ -208,7 +210,7 @@ html, body {
 
 /* ================= MAMA ================= */
 #bowl {
-  position: absolute; bottom: 6px; z-index: 3; left: 0; width: 30px; height: 22px; margin-left: -15px;
+  position: absolute; bottom: 8px; z-index: 3; left: 0; width: 24px; height: 17.6px; margin-left: -12px;
   opacity: 0; transform: translateY(6px); transition: opacity .35s, transform .35s;
   pointer-events: none;
 }

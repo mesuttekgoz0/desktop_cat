@@ -29,18 +29,44 @@
   }
 
   // ---- sabitler ----
-  const NEST = 140, FLOOR = 124;          // ayakların bastığı çizgi
-  const CAT_W = 64, CAT_H = 64;
-  const BED_X = 46, BOWL_X = 102;          // yatak ortası (bkz. style.css .bed), mama kabı
+  const NEST = 140;
+  const CAT_W = 64, CAT_H = 64;            // #cat kutusu; ölçek bu kutunun alt-orta noktasından (patiler)
   const RIG = window.KEDI_RIG_INFO || null;
-  const HALF = RIG ? RIG.half : 32;
-  const MIN_X = Math.max(36, HALF + 3), MAX_X = Math.min(104, NEST - HALF - 3);
-  const HEAD_DX = RIG ? RIG.headDX : 0;          // kafanın gövde merkezine uzaklığı
+  const HALF = RIG ? RIG.half : 32;              // ölçek 1'de gövdenin yarı genişliği
+  const HEAD_DX = RIG ? RIG.headDX : 0;          // kafanın gövde merkezine uzaklığı (ölçek 1)
   const MOUTH_DX = RIG ? RIG.mouthDX : 25;
   const G = 900;                           // yerçekimi px/s²
   const rand = (a, b) => a + Math.random() * (b - a);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const sign = (v) => (v < 0 ? -1 : 1);
+
+  // ---- oda perspektifi ----
+  // Kedi zeminde iki eksende gezer: x (yatay) ve z (derinlik; 0 = ön, 1 = arka duvarın dibi).
+  // Arkaya gittikçe patilerin bastığı çizgi yukarı kayar ve kedi küçülür.
+  // Değerler arka plan resminden ölçüldü (süpürgelik ~y110, sağ duvar köşesi ~x125).
+  const FRONT_Y = 130, BACK_Y = 113;       // z=0 ve z=1'de patilerin y'si
+  const CAT_S = 0.78;                      // öndeki ölçek (oda ile orantılı)
+  const BACK_RATIO = 0.62;                 // arka duvar dibinde öndekine göre ölçek
+  const DEPTH_PX = 40;                     // derinliği yürümenin "uzunluğu" (hız hesabı için)
+  const FLOOR = FRONT_Y;                   // ön sıra: yumak, mama kabı, lazer burada
+  const footY = (z) => FRONT_Y + (BACK_Y - FRONT_Y) * z;
+  const scaleAt = (z) => CAT_S * (1 + (BACK_RATIO - 1) * z);
+  const wallX = (y) => 125.1 + (y - 110.1) * 1.3625;     // sağ duvarın zeminle birleştiği çizgi
+  const xMinAt = (z) => 4 + HALF * scaleAt(z);
+  const xMaxAt = (z) => Math.min(NEST - 4, wallX(footY(z)) - 2) - HALF * scaleAt(z);
+  const BED = { x: 112, z: 0.92 };         // yatak: sağ arka köşe
+  const BOWL_X = 102;                      // mama kabı (ön sıra)
+  const S0 = CAT_S;                        // ön sıradaki mesafeleri ölçeklemek için kısaltma
+
+  // yatağı köşeye, o derinliğin ölçeğinde yerleştir (ön kenar katmanı da aynı yere)
+  (function placeBed() {
+    const s = scaleAt(BED.z), w = 66 * s, y = footY(BED.z);
+    for (const el of [$('#bedBack'), $('#bedFront')]) {
+      el.style.width = w.toFixed(2) + 'px';
+      el.style.left = (BED.x - w / 2).toFixed(2) + 'px';
+      el.style.bottom = (NEST - (y + 11 * s)).toFixed(2) + 'px';
+    }
+  })();
 
   // ---- kalıcı durum ----
   const store = (() => {
@@ -54,8 +80,12 @@
   save();
 
   // ---- kedi ----
-  // vx: gerçek yatay hız (hızlanma/yavaşlama ile), vel: |vx| (iskelet adım hızı için)
-  const cat = { x: 70, y: 0, vx: 0, vel: 0, vy: 0, dir: 1, mode: 'idle', target: null, speed: 30, onArrive: null, busyUntil: 0 };
+  // x, z: zemindeki konum; target/tz: hedef. v: yürüme hızı (px/s), (ux, uz): yürüme yönü (birim).
+  // vx: yatay hız bileşeni, vel: v (iskelet adım hızı için). y/vy: zıplama.
+  const cat = {
+    x: 70, z: 0.15, y: 0, v: 0, ux: 1, uz: 0, vx: 0, vel: 0, vy: 0, dir: 1, step: 0,
+    mode: 'idle', target: null, tz: 0, speed: 30, onArrive: null, busyUntil: 0,
+  };
   // dönüş animasyonu: s = görünen yön (-1..1), t = ilerleme (0..1)
   // kind: 'back' → arkasını dönerek (kareli), 'squash' → daralıp aynalanarak
   const turn = { s: 1, from: 1, to: 1, t: 1, kind: 'squash', dur: 0.3 };
@@ -114,8 +144,10 @@
   const pose = (name, on = true) => catEl.classList.toggle(name, on);
   const posed = (name) => catEl.classList.contains(name);
 
-  function walkTo(x, speed = 30, cb = null) {
-    cat.target = clamp(x, MIN_X, MAX_X);
+  // z verilmezse ön sıraya (oyunlar, mama orada)
+  function walkTo(x, speed = 30, cb = null, z = 0) {
+    cat.tz = clamp(z, 0, 1);
+    cat.target = clamp(x, xMinAt(cat.tz), xMaxAt(cat.tz));
     cat.speed = speed;
     cat.onArrive = cb;
     catEl.style.setProperty('--wd', speed > 70 ? '.24s' : speed > 45 ? '.32s' : '.46s');
@@ -130,9 +162,10 @@
     const h = document.createElement('div');
     h.className = 'heart';
     h.innerHTML = HEART;
-    const headX = face.p > 0.5 ? 0 : cat.dir * (HEAD_DX || 14);   // karşıya bakıyorsa kafa ortada
-    h.style.left = (cat.x + headX + rand(-6, 6)) + 'px';
-    h.style.top = (FLOOR - CAT_H + 10 + cat.y) + 'px';
+    const s = scaleAt(cat.z);
+    const headX = (face.p > 0.5 ? 0 : cat.dir * (HEAD_DX || 14)) * s;   // karşıya bakıyorsa kafa ortada
+    h.style.left = (cat.x + headX + rand(-6, 6) * s) + 'px';
+    h.style.top = (footY(cat.z) + (cat.y - CAT_H + 10) * s) + 'px';
     h.style.setProperty('--dx', rand(-12, 12) + 'px');
     fx.appendChild(h);
     setTimeout(() => h.remove(), 1500);
@@ -144,8 +177,12 @@
     bubbleEl.textContent = text;
     bubbleEl.classList.add('on');
     const w = bubbleEl.offsetWidth || 60;
-    const x = clamp(cat.x + cat.dir * 10, w / 2 + 6, NEST - w / 2 - 6);
+    const s = scaleAt(cat.z);
+    const x = clamp(cat.x + cat.dir * 10 * s, w / 2 + 6, NEST - w / 2 - 6);
     bubbleEl.style.left = x + 'px';
+    // balon kedinin başının hemen üstünde (kedi arkadaysa daha aşağıda ve küçük)
+    const headTop = footY(cat.z) + (cat.y - 60) * s;
+    bubbleEl.style.bottom = Math.max(4, NEST - headTop + 3).toFixed(1) + 'px';
     clearTimeout(bubbleT);
     bubbleT = setTimeout(() => bubbleEl.classList.remove('on'), ms);
   }
@@ -178,7 +215,7 @@
   // ====================================================
   //  YUMAK
   // ====================================================
-  const yarn = { on: false, x: 0, y: 0, vx: 0, vy: 0, rot: 0, r: 8.5, bats: 0, goal: 6, born: 0, fadeAt: 0 };
+  const yarn = { on: false, x: 0, y: 0, vx: 0, vy: 0, rot: 0, r: 7, bats: 0, goal: 6, born: 0, fadeAt: 0 };
 
   function dropYarn() {
     endActivities();
@@ -224,7 +261,7 @@
     const onGround = yarn.y >= FLOOR - yarn.r - 0.5 && yarn.vy === 0;
     const dx = yarn.x - cat.x;
     const face = sign(dx);
-    const reach = 25;
+    const reach = 25 * S0;
     const slow = Math.abs(yarn.vx) < 35;
 
     // yeterince oynadı mı?
@@ -235,6 +272,13 @@
       yarn.fadeAt = now + 9000;
       pose('happy'); hearts(4); later(1800, () => pose('happy', false));
       if (Math.random() < 0.5) later(400, () => bubble('çok eğlendim! 🧶'));
+      return;
+    }
+
+    // oyun ön sırada: kedi odanın gerisindeyse önce öne gelir
+    if (cat.z > 0.04) {
+      pose('crouch', false); pose('lookup', false);
+      walkTo(yarn.x - face * reach, 70);
       return;
     }
 
@@ -250,14 +294,14 @@
 
     const dist = Math.abs(dx);
     if (dist > reach + 5) {
-      pose('crouch', dist < 55);
+      pose('crouch', dist < 55 * S0);
       walkTo(yarn.x - face * reach, slow ? 55 : 80);
       // sıçrayıp üstüne atlama
-      if (slow && dist > 38 && dist < 62 && cat.y === 0 && Math.random() < 0.025) {
+      if (slow && dist > 38 * S0 && dist < 62 * S0 && cat.y === 0 && Math.random() < 0.025) {
         jump(-210);
         walkTo(yarn.x - face * reach, 120);
       }
-    } else if (slow) {
+    } else if (slow && cat.v < 20) {
       stopWalk();
       cat.dir = face;
       batYarn(face);
@@ -269,7 +313,7 @@
     pose('crouch', true);
     later(260, () => {
       pose('bat', true);
-      if (yarn.on && Math.abs(yarn.x - cat.x) < 40) { kickYarn(face); yarn.bats++; }
+      if (yarn.on && Math.abs(yarn.x - cat.x) < 40 * S0) { kickYarn(face); yarn.bats++; }
     });
     later(560, () => { pose('bat', false); pose('crouch', false); });
   }
@@ -286,7 +330,7 @@
     bowlEl.classList.add('on', 'full');
     cat.mode = 'food';
     later(450, () => {
-      walkTo(bowlX - MOUTH_DX, 48, () => {
+      walkTo(bowlX - MOUTH_DX * S0, 48, () => {
         if (cat.mode !== 'food') return;
         cat.dir = 1;
         cat.mode = 'eat';
@@ -335,10 +379,11 @@
     if (now < cat.busyUntil) return;
     const dx = laser.x - cat.x;
     const face = sign(dx);
+    if (cat.z > 0.04) { pose('crouch', false); walkTo(laser.x - face * 18 * S0, 90); return; }   // önce öne gel
     pose('lookup', laser.y < FLOOR - 45);
-    if (Math.abs(dx) > 20) {
+    if (Math.abs(dx) > 20 * S0) {
       pose('crouch', true);
-      walkTo(laser.x - face * 18, 90);
+      walkTo(laser.x - face * 18 * S0, 90);
     } else {
       stopWalk();
       cat.dir = face;
@@ -359,13 +404,13 @@
     pose('crouch', false); pose('lookup', false); pose('happy', false); pose('groom', false);
     cat.mode = 'tobed';
     menuBtn('sleep', true);
-    walkTo(BED_X, 30, () => {
+    walkTo(BED.x, 30, () => {
       if (cat.mode !== 'tobed') return;
       cat.mode = 'sleep';
-      cat.dir = 1;
+      cat.dir = -1;                     // köşede, yüzü odaya dönük
       pose('sleep');
       nest.classList.add('dim');
-    });
+    }, BED.z);
   }
   function wake() {
     if (cat.mode === 'tobed') { stopWalk(); cat.mode = 'idle'; menuBtn('sleep', false); return; }
@@ -413,7 +458,11 @@
       if (Math.random() < 0.6) { sleep(); return; }
     }
     const r = Math.random();
-    if (r < 0.55) walkTo(rand(MIN_X, MAX_X), rand(24, 34));
+    if (r < 0.55) {
+      // çoğunlukla öne yakın, arada bir odanın gerisine
+      const z = Math.random() < 0.6 ? rand(0, 0.3) : rand(0.3, 0.75);
+      walkTo(rand(xMinAt(z), xMaxAt(z)), rand(24, 34), null, z);
+    }
     else if (r < 0.75) cat.dir *= -1;
     else if (r < 0.85) { pose('lookup'); later(1400, () => pose('lookup', false)); }
     else if (r < 0.92) { jump(-150); }
@@ -448,7 +497,7 @@
   const BUSY_POSES = ['walk', 'happy', 'crouch', 'bat', 'groom', 'eat', 'land', 'lookup', 'blink', 'twitch'];
   let rigBusy = true;
   function targetFps() {
-    if (rigBusy || dragging || laser.on || yarn.on || cat.target != null || cat.vx !== 0 || turn.t < 1 || face.p > 0 || cat.y < 0 || cat.vy !== 0) return 60;
+    if (rigBusy || dragging || laser.on || yarn.on || cat.target != null || cat.v > 0 || turn.t < 1 || face.p > 0 || cat.y < 0 || cat.vy !== 0) return 60;
     if (cat.mode !== 'idle' && cat.mode !== 'sleep') return 60;
     for (const p of BUSY_POSES) if (posed(p)) return 60;
     return cat.mode === 'sleep' ? 15 : 30;
@@ -505,31 +554,45 @@
       cat.vy += G * dt; cat.y += cat.vy * dt;
       if (cat.y >= 0) { if (cat.vy > 120) { pose('land'); setTimeout(() => pose('land', false), 120); } cat.y = 0; cat.vy = 0; }
     }
-    // yürüme: yumuşak kalkış, hedefe yaklaşırken yavaşlama, ters yöne gitmeden önce durup dönme
+    // yürüme (zeminde x + derinlik): yumuşak kalkış, hedefe yaklaşırken yavaşlama,
+    // yatayda ters yöne gidecekse önce durup dönme. Derinlik DEPTH_PX ile piksele çevrilir.
     const canWalk = cat.mode !== 'sleep' && cat.mode !== 'eat';
-    let want = 0;                                   // istenen hız (işaretli)
+    let want = 0, ux = cat.ux, uz = cat.uz;
     if (cat.target != null && canWalk && face.p === 0) {   // sana bakarken yürümez
-      const d = cat.target - cat.x;
-      if (Math.abs(d) < 0.8 && Math.abs(cat.vx) < 40) {
-        cat.x = cat.target; cat.vx = 0; cat.target = null;
+      const tz = cat.tz == null ? cat.z : cat.tz;
+      const dx = cat.target - cat.x, dz = (tz - cat.z) * DEPTH_PX;
+      const dist = Math.hypot(dx, dz);
+      if (dist < 0.8 && cat.v < 40) {
+        cat.x = cat.target; cat.z = tz; cat.v = 0; cat.target = null;
         const cb = cat.onArrive; cat.onArrive = null; cb && cb();
-      } else if (sign(d) !== cat.dir) {
-        if (Math.abs(cat.vx) < 12) cat.dir = sign(d);   // yavaşladıysa dön
+      } else if (Math.abs(dx) > 3 && sign(dx) !== cat.dir && Math.abs(dx) / dist > 0.3) {
+        if (cat.v < 12) cat.dir = sign(dx);              // yavaşladıysa dön
       } else if (turn.t > (turn.kind === 'back' ? BACK_WALK_AT : 0.55)) {   // dönüş bitmeye yakın yürümeye başla
-        want = sign(d) * Math.max(8, Math.min(cat.speed, Math.sqrt(2 * ARRIVE * Math.abs(d))));
+        want = Math.max(8, Math.min(cat.speed, Math.sqrt(2 * ARRIVE * dist)));
+        ux = dx / dist; uz = dz / dist;
       }
     }
-    if (!canWalk) cat.vx = 0;
+    if (!canWalk) cat.v = 0;
     else {
-      const speeding = want !== 0 && (cat.vx === 0 || sign(want) === sign(cat.vx)) && Math.abs(want) > Math.abs(cat.vx);
-      const rate = (speeding ? ACC : DEC) * (cat.y < 0 ? 0.15 : 1) * dt;   // havadayken hız pek değişmez
-      cat.vx += clamp(want - cat.vx, -rate, rate);
-      const nx = cat.x + cat.vx * dt;
-      if (cat.target != null && sign(cat.target - nx) !== sign(cat.target - cat.x)) { cat.x = cat.target; cat.vx = 0; }
-      else cat.x = nx;
-      if (cat.x < MIN_X || cat.x > MAX_X) { cat.x = clamp(cat.x, MIN_X, MAX_X); cat.vx = 0; }
+      const rate = (want > cat.v ? ACC : DEC) * (cat.y < 0 ? 0.15 : 1) * dt;   // havadayken hız pek değişmez
+      cat.v = Math.max(0, cat.v + clamp(want - cat.v, -rate, rate));
+      if (want > 0) { cat.ux = ux; cat.uz = uz; }
+      let nx = cat.x + cat.ux * cat.v * dt, nz = cat.z + cat.uz * cat.v * dt / DEPTH_PX;
+      if (cat.target != null) {
+        // hedefi geçmesin
+        const tz = cat.tz == null ? cat.z : cat.tz;
+        const before = (cat.target - cat.x) * cat.ux + (tz - cat.z) * DEPTH_PX * cat.uz;
+        const after = (cat.target - nx) * cat.ux + (tz - nz) * DEPTH_PX * cat.uz;
+        if (before > 0 && after <= 0) { nx = cat.target; nz = tz; cat.v = 0; }
+      }
+      cat.z = clamp(nz, 0, 1);
+      const lo = xMinAt(cat.z), hi = xMaxAt(cat.z);
+      if (nx < lo || nx > hi) { nx = clamp(nx, lo, hi); if (!cat.target) cat.v = 0; }
+      cat.x = nx;
     }
-    cat.vel = Math.abs(cat.vx);
+    cat.vel = cat.v;
+    cat.vx = cat.ux * cat.v;
+    cat.step += cat.v * dt;                              // adım sayacı (arkası dönük yürürken sallanma)
     pose('walk', cat.y === 0 && cat.vel > 2);
 
     // dönüş: tam bir yöne bakarken ve ayaktayken arkasını dönerek, aksi hâlde daralarak
@@ -561,8 +624,9 @@
     else if (cat.mode === 'laser') laserThink();
     else if (cat.mode === 'idle' && now >= face.until) idleThink();   // sana bakarken dolaşmaya kalkmaz
 
-    // çiz
-    setStyle(catEl, 'transform', `translate(${(cat.x - CAT_W / 2).toFixed(2)}px, ${(FLOOR - CAT_H + cat.y).toFixed(2)}px)`);
+    // çiz: kedi kutusu patilerin olduğu noktadan, derinliğe göre ölçeklenir
+    const cs = scaleAt(cat.z), fy = footY(cat.z);
+    setStyle(catEl, 'transform', `translate(${(cat.x - CAT_W / 2).toFixed(2)}px, ${(fy - CAT_H + cat.y * cs).toFixed(2)}px) scale(${cs.toFixed(4)})`);
     // dönüşte en dar hâlde bile %22 genişlikte kalır (çizgiye dönüşmesin); ortada hafif çömelme
     let sx, sy = 1, shadowW, frameName = null, frameDir = 1;
     if (turn.kind === 'back' && turn.t < 1) {
@@ -594,17 +658,30 @@
       }
       shadowW = 1 - 0.4 * e;
     }
+    // odanın içine doğru yürürken arkası dönük: çapraz giderken arka-3/4, dümdüz giderken arka.
+    // Kareler hareketsiz olduğu için adım sallantısı eklenir.
+    let ty = 0;
+    const away = cat.v > 2 && cat.uz > 0.35 && cat.y === 0 && turn.t >= 1 && face.p === 0 && sprites.back34;
+    if (away) {
+      frameName = cat.uz > 0.92 ? 'back' : 'back34';
+      frameDir = cat.dir; fx = 1;
+      const ph = cat.step / 9;                          // ~9 px'te bir adım
+      ty = -1.6 * Math.abs(Math.sin(ph * Math.PI));
+      rot = 2.4 * Math.sin(ph * Math.PI);
+      sy = 1 - 0.02 * Math.abs(Math.cos(ph * Math.PI));
+      shadowW = frameName === 'back' ? 0.6 : 0.75;
+    }
     // kare gösterilirken iskeletli kedi gizlenir (çizilmeye devam eder, geri dönüşte hazır olsun)
     setStyle(catInner, 'visibility', frameName ? 'hidden' : 'visible');
     if (!frameName) setStyle(catInner, 'transform', `scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`);
     for (const name in sprites) {
       const on = name === frameName;
       setStyle(sprites[name], 'display', on ? 'block' : 'none');
-      if (on) setStyle(sprites[name], 'transform', `rotate(${rot.toFixed(2)}deg) scale(${(frameDir * fx).toFixed(3)}, ${sy.toFixed(3)})`);
+      if (on) setStyle(sprites[name], 'transform', `translateY(${ty.toFixed(2)}px) rotate(${rot.toFixed(2)}deg) scale(${(frameDir * fx).toFixed(3)}, ${sy.toFixed(3)})`);
     }
     rigBusy = window.__catTick ? !!window.__catTick(dt) : false;
     const sh = 1 + cat.y / 90;
-    setStyle(shadowEl, 'transform', `translate(${cat.x.toFixed(2)}px, ${FLOOR - 1}px) scale(${(sh * shadowW).toFixed(3)}, ${sh.toFixed(3)})`);
+    setStyle(shadowEl, 'transform', `translate(${cat.x.toFixed(2)}px, ${(fy - 1).toFixed(2)}px) scale(${(cs * sh * shadowW).toFixed(3)}, ${(cs * sh).toFixed(3)})`);
     setStyle(shadowEl, 'opacity', ((cat.mode === 'sleep' ? 0.6 : 1) * (0.5 + 0.5 * sh)).toFixed(3));
     yarnShadowEl.classList.toggle('on', yarn.on && !yarn.fadeAt);
     if (yarn.on) setStyle(yarnShadowEl, 'transform', `translate(${yarn.x.toFixed(2)}px, ${FLOOR - 1}px) scale(${(0.55 + 0.45 * Math.max(0, 1 - (FLOOR - yarn.r - yarn.y) / 110)).toFixed(3)})`);
