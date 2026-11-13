@@ -172,19 +172,45 @@
   }
   function hearts(n = 4, gap = 220) { for (let i = 0; i < n; i++) setTimeout(heart, i * gap); }
 
-  let bubbleT = null;
-  function bubble(text, ms = 2800) {
-    bubbleEl.textContent = text;
-    bubbleEl.classList.add('on');
-    const w = bubbleEl.offsetWidth || 60;
+  // ---- konuşma balonu ----
+  // Kedinin başının üstünde durur ve her karede onu takip eder; kuyruğu başı gösterir.
+  // Yazı harf harf gelir; yazılmamış kısım görünmez ama yer tutar, balon büyümez.
+  let bubbleT = null, typeT = null, bubbleOn = false, bubbleW = 60;
+  const TYPE_MS = 32;
+  const graphemes = (t) => {
+    try { return [...new Intl.Segmenter('tr', { granularity: 'grapheme' }).segment(t)].map((g) => g.segment); }
+    catch (_) { return Array.from(t); }
+  };
+  function placeBubble() {
     const s = scaleAt(cat.z);
-    const x = clamp(cat.x + cat.dir * 10 * s, w / 2 + 6, NEST - w / 2 - 6);
-    bubbleEl.style.left = x + 'px';
-    // balon kedinin başının hemen üstünde (kedi arkadaysa daha aşağıda ve küçük)
-    const headTop = footY(cat.z) + (cat.y - 60) * s;
-    bubbleEl.style.bottom = Math.max(4, NEST - headTop + 3).toFixed(1) + 'px';
+    const headX = cat.x + (face.p > 0.5 ? 0 : cat.dir * HEAD_DX) * s;   // başın ortası
+    const headTop = footY(cat.z) + (cat.y - 62) * s;                      // kulak uçları
+    const left = clamp(headX - bubbleW / 2, 5, NEST - bubbleW - 5);
+    const tail = clamp(headX - left, 9, bubbleW - 9);
+    setStyle(bubbleEl, 'left', left.toFixed(1) + 'px');
+    setStyle(bubbleEl, 'bottom', Math.max(4, NEST - headTop + 6).toFixed(1) + 'px');
+    const tv = tail.toFixed(1) + 'px';
+    if (bubbleEl.dataset.tail !== tv) { bubbleEl.dataset.tail = tv; bubbleEl.style.setProperty('--tail-x', tv); }
+  }
+  function bubble(text, ms = 2800) {
+    const parts = graphemes(text);
+    bubbleEl.innerHTML = '<span class="b-typed"></span><span class="b-rest"></span>';
+    const typed = bubbleEl.firstChild, rest = bubbleEl.lastChild;
+    rest.textContent = text;
+    bubbleW = bubbleEl.offsetWidth || 60;          // dönüşümden etkilenmeyen gerçek genişlik
+    placeBubble();
+    bubbleEl.classList.add('on');
+    bubbleOn = true;
+    clearInterval(typeT);
+    let i = 0;
+    typeT = setInterval(() => {
+      i++;
+      typed.textContent = parts.slice(0, i).join('');
+      rest.textContent = parts.slice(i).join('');
+      if (i >= parts.length) clearInterval(typeT);
+    }, TYPE_MS);
     clearTimeout(bubbleT);
-    bubbleT = setTimeout(() => bubbleEl.classList.remove('on'), ms);
+    bubbleT = setTimeout(() => { bubbleEl.classList.remove('on'); bubbleOn = false; }, ms + parts.length * TYPE_MS);
   }
 
   // ---- etkinlik zamanlayıcıları ----
@@ -690,6 +716,7 @@
       laserEl.classList.toggle('on', laser.visible);
       setStyle(laserEl, 'transform', `translate(${laser.x}px, ${laser.y}px)`);
     }
+    if (bubbleOn) placeBubble();
     updateZzz(t);
     schedule();
   }
