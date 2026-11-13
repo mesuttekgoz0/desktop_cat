@@ -18,6 +18,7 @@ let menuOpen = false;
 let menuSide = 'right';
 let drag = null;
 let scale = 1;
+let onTop = false;   // false: masaüstünde, diğer pencerelerin arkasında (bileşen gibi)
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const nestPx = () => Math.round(NEST * scale);
@@ -32,10 +33,26 @@ function loadSettings() {
   try {
     const s = JSON.parse(fs.readFileSync(settingsFile(), 'utf8'));
     if (typeof s.scale === 'number') scale = clamp(s.scale, 0.6, 2);
+    if (typeof s.onTop === 'boolean') onTop = s.onTop;
   } catch (_) {}
 }
 function saveSettings() {
-  try { fs.writeFileSync(settingsFile(), JSON.stringify({ scale })); } catch (_) {}
+  try { fs.writeFileSync(settingsFile(), JSON.stringify({ scale, onTop })); } catch (_) {}
+}
+
+// Varsayılan: masaüstü bileşeni gibi davranır, diğer pencerelerin arkasında kalır.
+// "Her zaman üstte" açıksa eskisi gibi her şeyin (tam ekran uygulamalar dahil) üstünde durur.
+function applyOnTop() {
+  if (!win) return;
+  win.setAlwaysOnTop(onTop, 'floating');
+  // macOS'ta tam ekran üstünde görünmek için süreç tipi değiştirilir; bileşen modunda buna gerek yok
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: onTop, skipTransformProcessType: !onTop });
+}
+// menüden "göster" denince öne getir; odak çalmadan
+function reveal() {
+  if (!win) return;
+  win.showInactive();
+  if (!onTop) win.moveTop();
 }
 
 function loadPos() {
@@ -76,7 +93,7 @@ function createWindow() {
     maximizable: false,
     minimizable: false,
     fullscreenable: false,
-    alwaysOnTop: true,
+    alwaysOnTop: onTop,
     skipTaskbar: true,
     hasShadow: false,
     acceptFirstMouse: true,
@@ -88,8 +105,7 @@ function createWindow() {
     },
   });
 
-  win.setAlwaysOnTop(true, 'floating');
-  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  applyOnTop();
   win.webContents.on('did-finish-load', () => {
     win.webContents.setVisualZoomLevelLimits(1, 1);
     win.webContents.setZoomFactor(scale);
@@ -165,8 +181,9 @@ function createTray() {
   rebuildTray = () => {
     const login = app.getLoginItemSettings().openAtLogin;
     tray.setContextMenu(Menu.buildFromTemplate([
-      { label: 'Kediyi göster / gizle', click: () => { if (!win) return; win.isVisible() ? win.hide() : win.showInactive(); } },
-      { label: 'Köşeye getir', click: () => { if (!win) return; const p = defaultPos(); win.setPosition(p.x, p.y); savePos(); win.showInactive(); } },
+      { label: 'Kediyi göster / gizle', click: () => { if (!win) return; win.isVisible() ? win.hide() : reveal(); } },
+      { label: 'Köşeye getir', click: () => { if (!win) return; const p = defaultPos(); win.setPosition(p.x, p.y); savePos(); reveal(); } },
+      { label: 'Her zaman üstte', type: 'checkbox', checked: onTop, click: (item) => { onTop = item.checked; saveSettings(); applyOnTop(); reveal(); rebuildTray(); } },
       {
         label: 'Boyut',
         submenu: SIZES.map((s) => ({
@@ -200,5 +217,5 @@ app.whenReady().then(() => {
   createTray();
 });
 
-app.on('second-instance', () => { if (win) win.showInactive(); });
+app.on('second-instance', () => reveal());
 app.on('window-all-closed', () => app.quit());

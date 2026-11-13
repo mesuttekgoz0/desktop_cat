@@ -15,7 +15,7 @@ Masaüstünde 140×140'lık bir yuvada yaşayan küçük kedi.
 - Pencere gerçek saate göre gündüz, akşam ve gece olur.
 - Zamanla acıkır, aç kalınca "acıktı 🐟" der. Durumu uygulama kapansa da kaydedilir.
 - ⚙️ **Ayarlar:** boyutu Küçük / Normal / Büyük / Dev olarak değiştir. Seçim kaydedilir.
-- Menü çubuğundaki kedi ikonundan gizleme, köşeye getirme, boyut, açılışta başlatma ve çıkış yapılabilir.
+- Masaüstü bileşeni gibi diğer pencerelerin arkasında durur. Menü çubuğundaki kedi ikonundan gizleme, köşeye getirme, "Her zaman üstte", boyut, açılışta başlatma ve çıkış yapılabilir.
 
 ## Kişiselleştirme
 
