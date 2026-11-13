@@ -22,60 +22,37 @@ html, body {
   width: 140px; height: 140px;
   border-radius: 34px;
   overflow: hidden;
-  background:
-    radial-gradient(120% 80% at 50% 0%, #fff8f2 0%, rgba(255,248,242,0) 60%),
-    linear-gradient(180deg, #ffeee3 0%, #fbdccc 100%);
-  box-shadow: inset 0 0 0 2.5px rgba(255,255,255,.8);
+  background: #f6dccb;   /* resimler yüklenene kadar */
+  isolation: isolate;
   cursor: pointer;
 }
 .side-left #nest { left: 46px; }
-#nest[data-time="dusk"]  { background: radial-gradient(120% 80% at 50% 0%, #fff1ea 0%, rgba(255,241,234,0) 60%), linear-gradient(180deg, #fbe4dc 0%, #f3cfc6 100%); }
-#nest[data-time="night"] { background: radial-gradient(120% 80% at 30% 20%, #f4effa 0%, rgba(244,239,250,0) 60%), linear-gradient(180deg, #e7def2 0%, #d6cae8 100%); }
+/* oda: üç katman üst üste, saate göre yavaşça geçiş yapar */
+.room {
+  position: absolute; inset: 0; z-index: -1;
+  background-size: cover; background-position: center;
+  opacity: 0; transition: opacity 3s ease;
+}
+#nest[data-time="day"]   .room[data-t="day"],
+#nest[data-time="dusk"]  .room[data-t="dusk"],
+#nest[data-time="night"] .room[data-t="night"] { opacity: 1; }
+/* çerçeve: ince, yarı saydam iç kenar (kart gibi dursun ama boyamayı ezmesin) */
+#nest::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: 20; pointer-events: none;
+  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.5), inset 0 0 14px rgba(120,70,50,.10);
+}
+/* uyurken: gri perde yerine ışık hafifçe kısılır, kenarlar kararır */
 #nest.dim::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(60% 50% at 28% 82%, rgba(255,220,170,.18), rgba(50,35,95,.18));
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 6;
+  background: radial-gradient(75% 70% at 35% 75%, rgba(40,25,60,0) 40%, rgba(40,25,60,.22) 100%);
+  animation: dimIn 1.2s ease both;
 }
+@keyframes dimIn { from { opacity: 0; } to { opacity: 1; } }
 
-.window-sky {
-  position: absolute; top: 15px; left: 15px; width: 38px; height: 32px;
-  border-radius: 10px; overflow: hidden;
-  isolation: isolate;   /* perdelerin z-index'i pencerenin içinde kalsın, balonun üstüne çıkmasın */
-  border: 3px solid #fff;
-  background: linear-gradient(180deg, #8ecbf5, #d5eeff);
-  box-shadow: 0 2px 4px rgba(190,120,90,.15);
-}
-.window-sky::after { content:""; position:absolute; left:50%; top:0; bottom:0; width:2px; margin-left:-1px; background:#fff; z-index: 2; }
-.curtain { position:absolute; top:-2px; width:9px; height:34px; background: linear-gradient(90deg,#f9c6d2,#f4adc0); z-index:3; }
-.curtain.l { left:-3px; border-radius: 0 0 8px 0; }
-.curtain.r { right:-3px; border-radius: 0 0 0 8px; background: linear-gradient(270deg,#f9c6d2,#f4adc0); }
-.sun  { position:absolute; width:11px; height:11px; border-radius:50%; background:#ffd45e; left:14px; top:7px; box-shadow:0 0 6px #ffe7a3; }
-.moon { position:absolute; width:10px; height:10px; border-radius:50%; left:12px; top:6px; box-shadow: 3px -2px 0 0 #fff5c4; display:none; }
-.star { position:absolute; width:2px; height:2px; background:#fff; border-radius:50%; display:none; }
-.star.a{ left:22px; top:6px } .star.b{ left:24px; top:18px } .star.c{ left:9px; top:20px }
-#nest[data-time="dusk"]  .window-sky { background: linear-gradient(180deg, #f5a49e, #ffd7a5); }
-#nest[data-time="dusk"]  .sun { top: 17px; background:#ffb066; }
-#nest[data-time="night"] .window-sky { background: linear-gradient(180deg, #2c3166, #4c4a8a); }
-#nest[data-time="night"] .sun { display:none; }
-#nest[data-time="night"] .moon, #nest[data-time="night"] .star { display:block; }
-
-.frame {
-  position: absolute; top: 19px; right: 20px; width: 24px; height: 21px;
-  border-radius: 6px; background: #fff; border: 2px solid #f3c7b5;
-  display: grid; place-items: center;
-  box-shadow: 0 2px 3px rgba(190,120,90,.12);
-}
-.frame svg { width: 13px; height: 12px; }
-.frame path { fill: #f38fa4; }
-
-.floor {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 34px;
-  background:
-    repeating-linear-gradient(90deg, transparent 0 34px, rgba(160,95,60,.10) 34px 35.5px),
-    linear-gradient(180deg, #f0c9a3, #e5b48b);
-  box-shadow: 0 -1.5px 0 rgba(255,255,255,.65);
-}
-
-.bed { position: absolute; left: 6px; bottom: 6px; width: 64px; height: 28px; pointer-events: none; }
+/* yatak: arka resim kedinin arkasında, ön kenar kedinin önünde (uyurken içine girmiş gibi) */
+.bed { position: absolute; left: 13px; bottom: 5px; width: 66px; pointer-events: none; }
+#bedFront { z-index: 3; display: none; }
+#cat.sleep ~ #bedFront { display: block; }
 
 .shadow {
   position: absolute; left: 0; top: 0; width: 46px; height: 8px; margin: -4px 0 0 -23px;
@@ -222,29 +199,23 @@ html, body {
 
 /* ================= YUMAK ================= */
 #yarn {
-  position: absolute; left: 0; top: 0; width: 17px; height: 17px;
+  position: absolute; left: 0; top: 0; width: 17px; height: 17px; z-index: 4;
   opacity: 0; pointer-events: none; transition: opacity .6s;
   will-change: transform;
 }
 #yarn.on { opacity: 1; pointer-events: auto; cursor: grab; }
-#yarn svg { width: 100%; height: 100%; overflow: visible; display: block; filter: drop-shadow(0 .5px .5px rgba(160,60,90,.35)); }
-.y-line { fill: none; stroke: #ffd3de; stroke-width: 1.1; stroke-linecap: round; opacity: .85; }
-.y-thread { fill: none; stroke: #e2708e; stroke-width: 1.2; stroke-linecap: round; }
+#yarn img { width: 100%; height: 100%; display: block; filter: drop-shadow(0 .6px .6px rgba(160,60,90,.35)); }
 
 /* ================= MAMA ================= */
 #bowl {
-  position: absolute; bottom: 7px; z-index: 3; left: 0; width: 28px; height: 15px; margin-left: -14px;
+  position: absolute; bottom: 6px; z-index: 3; left: 0; width: 30px; height: 22px; margin-left: -15px;
   opacity: 0; transform: translateY(6px); transition: opacity .35s, transform .35s;
   pointer-events: none;
 }
 #bowl.on { opacity: 1; transform: translateY(0); }
-#bowl svg { width: 100%; height: 100%; display: block; overflow: visible; filter: drop-shadow(0 1px 1px rgba(70,110,160,.3)); }
-.bowl-b { fill: url(#gBowl); }
-.bowl-h { stroke: rgba(255,255,255,.7); stroke-width: 1.4; stroke-linecap: round; }
-.bowl-fish { fill: #fff; opacity: .8; }
-.kibble circle { fill: #d0925a; stroke: #a8693a; stroke-width: .6; }
-.kibble { transition: opacity .6s, transform .6s; transform-box: fill-box; transform-origin: 50% 100%; }
-#bowl:not(.full) .kibble { opacity: 0; transform: scaleY(.2); }
+#bowl img { position: absolute; inset: 0; width: 100%; height: 100%; filter: drop-shadow(0 1px 1px rgba(70,90,130,.25)); }
+#bowl .bowl-full { transition: opacity .8s; }
+#bowl:not(.full) .bowl-full { opacity: 0; }
 
 /* ================= LAZER ================= */
 #laser {
@@ -289,9 +260,9 @@ html, body {
 #menu button {
   width: 25px; height: 25px; border-radius: 50%;
   border: none; padding: 0; margin: 0;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(110,60,40,.22), inset 0 0 0 1.5px #fbe1d4;
-  font-size: 13px; line-height: 25px; text-align: center;
+  background: #fffaf5;
+  box-shadow: 0 1px 3px rgba(110,60,40,.22), inset 0 0 0 1.2px #f0d6c8;
+  display: grid; place-items: center;
   cursor: pointer;
   opacity: 0; transform: scale(.4) translateX(-14px);
   transition: transform .22s cubic-bezier(.3,1.6,.5,1), opacity .18s, background .15s;
@@ -306,6 +277,17 @@ html, body {
 #menu button:hover { background: #fff4ee; transform: scale(1.08); transition-delay: 0s; }
 #menu button:active { transform: scale(.94); }
 #menu button.active { background: #ffe3ea; }
+/* menü ikonları: sahnedeki resimler + kedinin kahverengi çizgisine uygun küçük çizimler */
+#menu .mi { width: 17px; height: 17px; display: block; }
+#menu .mi-img { width: 16px; height: auto; display: block; pointer-events: none; }
+#menu .mi-bowl { width: 18px; }
+.mi-laser {
+  width: 8px; height: 8px; border-radius: 50%; background: #ff3b4c;
+  box-shadow: 0 0 3px 1.5px rgba(255,59,76,.45), 0 0 7px 3px rgba(255,59,76,.18);
+}
+#menu button[data-act="sleep"] .i-sun { display: none; }
+#menu button[data-act="sleep"].active .i-sun { display: block; }
+#menu button[data-act="sleep"].active .i-moon { display: none; }
 
 /* iskeletli kedi yüklenince çizim kediyi gizle */
 .rig-mode #catSvg { display: none; }

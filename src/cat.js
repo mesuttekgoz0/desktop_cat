@@ -11,10 +11,27 @@
   const shadowEl = $('#shadow'), yarnShadowEl = $('#yarnShadow');
   const api = window.kedi || null;
 
+  // ---- sahne resimleri: oda (gündüz/akşam/gece) ve eşyalar (src/kedi/sahne-veri.js) ----
+  const SAHNE = window.KEDI_SAHNE || null;
+  if (SAHNE) {
+    document.querySelectorAll('.room').forEach((el) => {
+      const uri = SAHNE.bg[el.dataset.t];
+      if (uri) el.style.backgroundImage = `url("${uri}")`;
+    });
+    const put = (img, d) => { if (img && d) img.src = d.src; };
+    put($('#bedBack'), SAHNE.bed);
+    put($('#bedFront'), SAHNE.bedFront);
+    put(bowlEl.querySelector('.bowl-full'), SAHNE.bowlFull);
+    put(bowlEl.querySelector('.bowl-empty'), SAHNE.bowlEmpty);
+    put(yarnEl.querySelector('img'), SAHNE.yarn);
+    put(menuEl.querySelector('[data-act="yarn"] img'), SAHNE.yarn);
+    put(menuEl.querySelector('[data-act="food"] img'), SAHNE.bowlFull);
+  }
+
   // ---- sabitler ----
   const NEST = 140, FLOOR = 124;          // ayakların bastığı çizgi
   const CAT_W = 64, CAT_H = 64;
-  const BED_X = 38, BOWL_X = 102;
+  const BED_X = 46, BOWL_X = 102;          // yatak ortası (bkz. style.css .bed), mama kabı
   const RIG = window.KEDI_RIG_INFO || null;
   const HALF = RIG ? RIG.half : 32;
   const MIN_X = Math.max(36, HALF + 3), MAX_X = Math.min(104, NEST - HALF - 3);
@@ -341,7 +358,7 @@
     stopWalk();
     pose('crouch', false); pose('lookup', false); pose('happy', false); pose('groom', false);
     cat.mode = 'tobed';
-    menuBtn('sleep', true, '☀️');
+    menuBtn('sleep', true);
     walkTo(BED_X, 30, () => {
       if (cat.mode !== 'tobed') return;
       cat.mode = 'sleep';
@@ -351,12 +368,12 @@
     });
   }
   function wake() {
-    if (cat.mode === 'tobed') { stopWalk(); cat.mode = 'idle'; menuBtn('sleep', false, '🌙'); return; }
+    if (cat.mode === 'tobed') { stopWalk(); cat.mode = 'idle'; menuBtn('sleep', false); return; }
     if (cat.mode !== 'sleep') return;
     pose('sleep', false);
     nest.classList.remove('dim');
     cat.mode = 'idle';
-    menuBtn('sleep', false, '🌙');
+    menuBtn('sleep', false);
   }
 
   // Yeni bir etkinlikten önce her şeyi temiz bir duruma getirir.
@@ -366,7 +383,7 @@
     stopLaser();
     if (yarn.on && !yarn.fadeAt) yarn.fadeAt = now + 600;
     bowlEl.classList.remove('on', 'full');
-    if (cat.mode === 'tobed') menuBtn('sleep', false, '🌙');
+    if (cat.mode === 'tobed') menuBtn('sleep', false);
     if (cat.mode !== 'sleep') cat.mode = 'idle';
     stopWalk();
     for (const p of ['eat', 'crouch', 'lookup', 'bat', 'groom', 'happy']) pose(p, false);
@@ -691,11 +708,10 @@
   markScale(1);
   api && api.onBlur(closeSettings);
 
-  function menuBtn(act, active, label) {
+  // active: düğme basılı görünür (uyku düğmesinde ay yerine güneş çıkar; bkz. style.css)
+  function menuBtn(act, active) {
     const b = menuEl.querySelector(`[data-act="${act}"]`);
-    if (!b) return;
-    b.classList.toggle('active', active);
-    if (label) b.textContent = label;
+    if (b) b.classList.toggle('active', active);
   }
 
   menuEl.addEventListener('click', (e) => {
