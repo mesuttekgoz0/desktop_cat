@@ -39,6 +39,7 @@ html, body {
 .window-sky {
   position: absolute; top: 15px; left: 15px; width: 38px; height: 32px;
   border-radius: 10px; overflow: hidden;
+  isolation: isolate;   /* perdelerin z-index'i pencerenin içinde kalsın, balonun üstüne çıkmasın */
   border: 3px solid #fff;
   background: linear-gradient(180deg, #8ecbf5, #d5eeff);
   box-shadow: 0 2px 4px rgba(190,120,90,.15);
@@ -256,7 +257,7 @@ html, body {
 #app.laser-on #nest { cursor: none; }
 
 /* ================= EFEKTLER ================= */
-#fx { position: absolute; inset: 0; pointer-events: none; }
+#fx { position: absolute; inset: 0; pointer-events: none; z-index: 7; }
 .heart { position: absolute; width: 10px; height: 9px; margin-left: -5px; animation: heart 1.4s ease-out forwards; }
 .heart path { fill: #f4708e; }
 @keyframes heart {
@@ -266,7 +267,7 @@ html, body {
 }
 
 #bubble {
-  position: absolute; left: 70px; bottom: 78px;
+  position: absolute; left: 70px; bottom: 78px; z-index: 8;
   width: max-content; max-width: 126px; padding: 4px 8px;
   background: #fff; color: #5a3d30;
   border-radius: 10px;
