@@ -35,6 +35,7 @@
       "category": "public.app-category.entertainment",
       "icon": "build/icon.png",
       "identity": "-",
+      "hardenedRuntime": false,
       "notarize": false,
       "extendInfo": {
         "LSUIElement": true
